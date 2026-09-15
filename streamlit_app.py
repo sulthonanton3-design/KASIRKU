@@ -226,36 +226,96 @@ elif menu == "📝 Kelola & Edit Produk":
     with f_col3:
         status_filter = st.selectbox("Status", ["Semua Status", "Aktif", "Draft"], label_visibility="collapsed")
 
+    # PANEL EDIT PRODUK & BAHAN BAKU / DRAFT
     if 'edit_product_id' in st.session_state:
         st.markdown("---")
-        st.subheader("✏️ Edit Data Produk")
+        st.subheader("✏️ Edit Data Produk & Resep Bahan Baku")
         p_edit_id = st.session_state['edit_product_id']
         c.execute("SELECT * FROM products WHERE id=?", (p_edit_id,))
         p_data = c.fetchone()
         
         if p_data:
-            with st.form("form_edit_product"):
-                col_e1, col_e2 = st.columns(2)
+            c.execute("SELECT value FROM settings WHERE key='overhead_percent'")
+            res_ovh = c.fetchone()
+            overhead_pct = float(res_ovh[0]) if res_ovh else 20.0
+
+            # Ambil resep lama
+            c.execute("SELECT material_id, qty FROM recipes WHERE product_id=?", (p_edit_id,))
+            old_recipes = dict(c.fetchall())
+
+            with st.container(border=True):
+                col_e1, col_e2, col_e3 = st.columns(3)
                 with col_e1:
                     e_name = st.text_input("Nama Produk", value=p_data[2])
                     e_sku = st.text_input("SKU / Barcode", value=p_data[1] if p_data[1] else "")
-                    e_price = st.number_input("Harga Jual (Rp)", value=float(p_data[4]))
                 with col_e2:
-                    e_stock = st.number_input("Stok", value=float(p_data[6]) if p_data[6] is not None else 0.0)
-                    e_status = st.selectbox("Status", ["Aktif", "Draft"], index=1 if p_data[8] == 1 else 0)
+                    categories = ["Aksesoris", "Rumah Tangga", "Peralatan Olahraga", "Makanan/Minuman", "Lainnya"]
+                    curr_cat_idx = categories.index(p_data[3]) if p_data[3] in categories else 0
+                    e_category = st.selectbox("Kategori", categories, index=curr_cat_idx)
+                    e_price = st.number_input("Harga Jual (Rp)", value=float(p_data[4]))
+                with col_e3:
+                    e_stock = st.number_input("Stok Jual", value=float(p_data[6]) if p_data[6] is not None else 0.0)
+                    e_status = st.selectbox("Status Produk", ["Draft", "Aktif"], index=0 if p_data[8] == 1 else 1)
+
+                st.markdown("---")
+                st.subheader("🥣 Edit Bahan Baku / Resep Porsi")
                 
-                col_btn1, col_btn2 = st.columns(2)
-                with col_btn1:
-                    if st.form_submit_button("💾 Simpan Perubahan", type="primary"):
-                        is_draft_val = 1 if e_status == "Draft" else 0
-                        c.execute("UPDATE products SET name=?, sku=?, price=?, stock=?, is_draft=? WHERE id=?", 
-                                  (e_name, e_sku, e_price, e_stock, is_draft_val, p_edit_id))
+                mats_df = pd.read_sql("SELECT id, name, unit, cost_per_unit FROM raw_materials", conn)
+                updated_recipes = []
+                total_bahan_cost = 0.0
+
+                if not mats_df.empty:
+                    st.caption("Masukkan takaran bahan baku per porsi/satuan:")
+                    for idx, row in mats_df.iterrows():
+                        old_qty = old_recipes.get(row['id'], 0.0)
+                        req_qty = st.number_input(f"Takaran {row['name']} ({row['unit']})", min_value=0.0, value=float(old_qty), key=f"edit_mat_{row['id']}")
+                        if req_qty > 0:
+                            total_bahan_cost += req_qty * row['cost_per_unit']
+                            updated_recipes.append((row['id'], req_qty))
+
+                overhead_val = total_bahan_cost * (overhead_pct / 100.0)
+                new_hpp_satuan = total_bahan_cost + overhead_val
+                new_profit = e_price - new_hpp_satuan
+                new_margin = (new_profit / e_price * 100) if e_price > 0 else 0.0
+
+                st.markdown("---")
+                st.markdown("#### 📊 Kalkulasi HPP Terbaru")
+                cm1, cm2, cm3, cm4 = st.columns(4)
+                cm1.metric("HPP Bahan", f"Rp {total_bahan_cost:,.2f}")
+                cm2.metric(f"Overhead ({overhead_pct}%)", f"Rp {overhead_val:,.2f}")
+                cm3.metric("TOTAL HPP PER PORSI", f"Rp {new_hpp_satuan:,.2f}")
+                cm4.metric("Margin Profit", f"{new_margin:.2f}% (Rp {new_profit:,.0f})")
+
+                st.markdown("---")
+                btn_c1, btn_c2, btn_c3 = st.columns(3)
+                
+                with btn_c1:
+                    if st.button("🚀 Simpan & Aktifkan Produk", type="primary", use_container_width=True):
+                        c.execute("UPDATE products SET name=?, sku=?, category=?, price=?, hpp=?, stock=?, is_draft=0 WHERE id=?", 
+                                  (e_name, e_sku, e_category, e_price, new_hpp_satuan, e_stock, p_edit_id))
+                        c.execute("DELETE FROM recipes WHERE product_id=?", (p_edit_id,))
+                        for m_id, q_qty in updated_recipes:
+                            c.execute("INSERT INTO recipes (product_id, material_id, qty) VALUES (?, ?, ?)", (p_edit_id, m_id, q_qty))
                         conn.commit()
                         del st.session_state['edit_product_id']
-                        st.success("Produk berhasil diperbarui!")
+                        st.success(f"Produk '{e_name}' berhasil direvisi & DIPUBLIKASIKAN (AKTIF)!")
                         st.rerun()
-                with col_btn2:
-                    if st.form_submit_button("Batal"):
+
+                with btn_c2:
+                    if st.button("💾 Simpan Perubahan (Tetap Draft)", use_container_width=True):
+                        is_draft_code = 1 if e_status == "Draft" else 0
+                        c.execute("UPDATE products SET name=?, sku=?, category=?, price=?, hpp=?, stock=?, is_draft=? WHERE id=?", 
+                                  (e_name, e_sku, e_category, e_price, new_hpp_satuan, e_stock, is_draft_code, p_edit_id))
+                        c.execute("DELETE FROM recipes WHERE product_id=?", (p_edit_id,))
+                        for m_id, q_qty in updated_recipes:
+                            c.execute("INSERT INTO recipes (product_id, material_id, qty) VALUES (?, ?, ?)", (p_edit_id, m_id, q_qty))
+                        conn.commit()
+                        del st.session_state['edit_product_id']
+                        st.success(f"Perubahan produk '{e_name}' berhasil disimpan!")
+                        st.rerun()
+
+                with btn_c3:
+                    if st.button("❌ Batal Edit", use_container_width=True):
                         del st.session_state['edit_product_id']
                         st.rerun()
 
@@ -279,7 +339,7 @@ elif menu == "📝 Kelola & Edit Produk":
                 df_products['sku'].astype(str).str.contains(search_kw, case=False, na=False)
             ]
 
-        h1, h2, h3, h4, h5, h6, h7, h8, h9 = st.columns([0.8, 1.5, 2.5, 1.8, 1.5, 1.5, 1.0, 1.0, 1.2])
+        h1, h2, h3, h4, h5, h6, h7, h8, h9 = st.columns([0.8, 1.5, 2.5, 1.8, 1.5, 1.5, 1.0, 1.0, 1.5])
         with h1: st.caption("**GAMBAR**")
         with h2: st.caption("**SKU/BARCODE**")
         with h3: st.caption("**NAMA**")
@@ -293,7 +353,7 @@ elif menu == "📝 Kelola & Edit Produk":
         st.divider()
 
         for idx, row in df_products.iterrows():
-            c1, c2, c3, c4, c5, c6, c7, c8, c9 = st.columns([0.8, 1.5, 2.5, 1.8, 1.5, 1.5, 1.0, 1.0, 1.2])
+            c1, c2, c3, c4, c5, c6, c7, c8, c9 = st.columns([0.8, 1.5, 2.5, 1.8, 1.5, 1.5, 1.0, 1.0, 1.5])
             
             with c1:
                 if row['image'] and os.path.exists(row['image']):
@@ -496,7 +556,6 @@ elif menu == "🍔 Buat Produk & Kalkulasi HPP":
                     img_path = save_uploaded_file(p_img)
                     final_sku = p_sku if p_sku else f"DPT-{int(datetime.now().timestamp())}"
                     
-                    # 8 TANDA TANYA UNTUK 8 KOLOM DAN 8 VARIABEL TUPLE
                     c.execute("""
                         INSERT INTO products (sku, name, category, price, hpp, stock, image, is_draft) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -517,7 +576,6 @@ elif menu == "🍔 Buat Produk & Kalkulasi HPP":
                 img_path = save_uploaded_file(p_img)
                 final_sku = p_sku if p_sku else f"DPT-{int(datetime.now().timestamp())}"
                 
-                # 8 TANDA TANYA UNTUK 8 KOLOM DAN 8 VARIABEL TUPLE
                 c.execute("""
                     INSERT INTO products (sku, name, category, price, hpp, stock, image, is_draft) 
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
