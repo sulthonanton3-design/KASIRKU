@@ -44,15 +44,18 @@ conn.commit()
 
 # Default Settings & Admin
 c.execute("INSERT OR IGNORE INTO users VALUES (1, 'admin', 'admin123', 'Admin')")
-c.execute("INSERT OR IGNORE INTO settings VALUES ('receipt_header', 'SELAMAT DATANG DI TOKO KAMI')")
+c.execute("INSERT OR IGNORE INTO settings VALUES ('receipt_header', 'SELAMAT DATANG DI NGE CAFE')")
 c.execute("INSERT OR IGNORE INTO settings VALUES ('receipt_footer', 'Terima Kasih Atas Kunjungan Anda!')")
 c.execute("INSERT OR IGNORE INTO settings VALUES ('overhead_percent', '20')")
 conn.commit()
 
+# Daftar Kategori Terbaru
+LIST_KATEGORI = ["Kopi", "Non Kopi", "Dessert", "Main Course", "Lain-lain"]
+
 # ---------------------------------------------------------
 # AUTHENTICATION & CONFIG
 # ---------------------------------------------------------
-st.set_page_config(page_title="Sistem POS & HPP Modern", layout="wide")
+st.set_page_config(page_title="Sistem POS & HPP NGE' CAFE", layout="wide")
 
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
@@ -176,7 +179,20 @@ if menu == "🛒 Kasir (POS)":
                 
                 pay_method = st.selectbox("Metode Pembayaran", ["Cash", "Transfer Bank", "E-Wallet (QRIS)"])
                 
-                if st.button("💳 BAYAR SEKARANG", type="primary", use_container_width=True):
+                paid_amount = total
+                change = 0.0
+                can_process = True
+
+                if pay_method == "Cash":
+                    paid_amount = st.number_input("Nominal Pembayaran (Rp)", min_value=0.0, value=float(total), step=5000.0)
+                    change = paid_amount - total
+                    if change >= 0:
+                        st.success(f"💵 **Kembalian: Rp {change:,.0f}**")
+                    else:
+                        st.error(f"⚠️ Pembayaran kurang Rp {abs(change):,.0f}")
+                        can_process = False
+
+                if st.button("💳 BAYAR SEKARANG", type="primary", use_container_width=True, disabled=not can_process):
                     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     c.execute("INSERT INTO transactions (date, total, payment_method, user) VALUES (?, ?, ?, ?)",
                               (now, total, pay_method, st.session_state['username']))
@@ -222,7 +238,7 @@ elif menu == "📝 Kelola & Edit Produk":
     with f_col1:
         search_kw = st.text_input("Cari", placeholder="🔍 Cari nama, SKU, barcode...", label_visibility="collapsed")
     with f_col2:
-        cat_filter = st.selectbox("Kategori", ["Semua Kategori", "Aksesoris", "Rumah Tangga", "Peralatan Olahraga", "Makanan/Minuman"], label_visibility="collapsed")
+        cat_filter = st.selectbox("Kategori", ["Semua Kategori"] + LIST_KATEGORI, label_visibility="collapsed")
     with f_col3:
         status_filter = st.selectbox("Status", ["Semua Status", "Aktif", "Draft"], label_visibility="collapsed")
 
@@ -239,7 +255,6 @@ elif menu == "📝 Kelola & Edit Produk":
             res_ovh = c.fetchone()
             overhead_pct = float(res_ovh[0]) if res_ovh else 20.0
 
-            # Ambil resep lama
             c.execute("SELECT material_id, qty FROM recipes WHERE product_id=?", (p_edit_id,))
             old_recipes = dict(c.fetchall())
 
@@ -248,14 +263,17 @@ elif menu == "📝 Kelola & Edit Produk":
                 with col_e1:
                     e_name = st.text_input("Nama Produk", value=p_data[2])
                     e_sku = st.text_input("SKU / Barcode", value=p_data[1] if p_data[1] else "")
+                    e_img = st.file_uploader("Ganti Foto Produk (Opsional)", type=["jpg", "png", "jpeg"])
                 with col_e2:
-                    categories = ["Aksesoris", "Rumah Tangga", "Peralatan Olahraga", "Makanan/Minuman", "Lainnya"]
-                    curr_cat_idx = categories.index(p_data[3]) if p_data[3] in categories else 0
-                    e_category = st.selectbox("Kategori", categories, index=curr_cat_idx)
+                    curr_cat_idx = LIST_KATEGORI.index(p_data[3]) if p_data[3] in LIST_KATEGORI else 0
+                    e_category = st.selectbox("Kategori Produk", LIST_KATEGORI, index=curr_cat_idx)
                     e_price = st.number_input("Harga Jual (Rp)", value=float(p_data[4]))
                 with col_e3:
                     e_stock = st.number_input("Stok Jual", value=float(p_data[6]) if p_data[6] is not None else 0.0)
                     e_status = st.selectbox("Status Produk", ["Draft", "Aktif"], index=0 if p_data[8] == 1 else 1)
+                    if p_data[7] and os.path.exists(p_data[7]):
+                        st.caption("Gambar Saat Ini:")
+                        st.image(p_data[7], width=70)
 
                 st.markdown("---")
                 st.subheader("🥣 Edit Bahan Baku / Resep Porsi")
@@ -289,10 +307,12 @@ elif menu == "📝 Kelola & Edit Produk":
                 st.markdown("---")
                 btn_c1, btn_c2, btn_c3 = st.columns(3)
                 
+                img_path = save_uploaded_file(e_img) if e_img else p_data[7]
+
                 with btn_c1:
                     if st.button("🚀 Simpan & Aktifkan Produk", type="primary", use_container_width=True):
-                        c.execute("UPDATE products SET name=?, sku=?, category=?, price=?, hpp=?, stock=?, is_draft=0 WHERE id=?", 
-                                  (e_name, e_sku, e_category, e_price, new_hpp_satuan, e_stock, p_edit_id))
+                        c.execute("UPDATE products SET name=?, sku=?, category=?, price=?, hpp=?, stock=?, image=?, is_draft=0 WHERE id=?", 
+                                  (e_name, e_sku, e_category, e_price, new_hpp_satuan, e_stock, img_path, p_edit_id))
                         c.execute("DELETE FROM recipes WHERE product_id=?", (p_edit_id,))
                         for m_id, q_qty in updated_recipes:
                             c.execute("INSERT INTO recipes (product_id, material_id, qty) VALUES (?, ?, ?)", (p_edit_id, m_id, q_qty))
@@ -304,8 +324,8 @@ elif menu == "📝 Kelola & Edit Produk":
                 with btn_c2:
                     if st.button("💾 Simpan Perubahan (Tetap Draft)", use_container_width=True):
                         is_draft_code = 1 if e_status == "Draft" else 0
-                        c.execute("UPDATE products SET name=?, sku=?, category=?, price=?, hpp=?, stock=?, is_draft=? WHERE id=?", 
-                                  (e_name, e_sku, e_category, e_price, new_hpp_satuan, e_stock, is_draft_code, p_edit_id))
+                        c.execute("UPDATE products SET name=?, sku=?, category=?, price=?, hpp=?, stock=?, image=?, is_draft=? WHERE id=?", 
+                                  (e_name, e_sku, e_category, e_price, new_hpp_satuan, e_stock, img_path, is_draft_code, p_edit_id))
                         c.execute("DELETE FROM recipes WHERE product_id=?", (p_edit_id,))
                         for m_id, q_qty in updated_recipes:
                             c.execute("INSERT INTO recipes (product_id, material_id, qty) VALUES (?, ?, ?)", (p_edit_id, m_id, q_qty))
@@ -408,73 +428,157 @@ elif menu == "📝 Kelola & Edit Produk":
 # MENU 3: INPUT & STOK BAHAN BAKU
 # ---------------------------------------------------------
 elif menu == "📦 Input & Stok Bahan Baku":
-    st.header("📦 Manajemen Bahan Baku & Peringatan Stok")
+    st.header("📦 Manajemen Bahan Baku, Restock & Modal Terendap")
+
+    # AKUMULASI DRAFT DATA MODAL BELUM TEROLAH
+    df_mats_all = pd.read_sql("SELECT * FROM raw_materials", conn)
+    total_modal_terendap = 0.0
+    if not df_mats_all.empty:
+        df_mats_all['nilai_modal'] = df_mats_all['stock'] * df_mats_all['cost_per_unit']
+        total_modal_terendap = df_mats_all['nilai_modal'].sum()
+
+    st.metric(label="💰 **TOTAL MODAL BAHAN BAKU BELUM TEROLAH (SISA STOK)**", value=f"Rp {total_modal_terendap:,.2f}")
+    st.markdown("---")
     
-    with st.expander("➕ Tambah Bahan Baku Baru"):
-        col1, col2 = st.columns(2)
-        with col1:
-            name = st.text_input("Nama Bahan Baku (Contoh: Whipcream, Cocoa Powder)")
-            unit = st.selectbox("Satuan", ["Gram", "ML", "Pcs", "Kg", "Liter"])
-            img_file = st.file_uploader("Upload Gambar Bahan Baku (Opsional)", type=["jpg", "png", "jpeg"])
-        with col2:
-            stock = st.number_input("Jumlah Stok Beli", min_value=0.0, step=1.0)
-            cost_total = st.number_input("Total Harga Beli Seluruh Stok (Rp)", min_value=0.0, step=1000.0)
-        
-        if st.button("Simpan Bahan Baku"):
-            if stock > 0 and name:
-                cost_per_unit = cost_total / stock
+    # FORM INPUT / RESTOCK BAHAN BAKU DENGAN AUTO RESET ST-FORM
+    with st.expander("➕ Input Bahan Baku Baru / Restock Barang Datang", expanded=True):
+        with st.form("form_tambah_bahan", clear_on_submit=True):
+            col1, col2 = st.columns(2)
+            with col1:
+                name = st.text_input("Nama Bahan Baku (Contoh: Biji Kopi, Susu UHT)")
+                unit = st.selectbox("Satuan Unit", ["Gram", "ML", "Pcs", "Kg", "Liter"])
+                img_file = st.file_uploader("Upload Gambar Bahan Baku (Opsional)", type=["jpg", "png", "jpeg"])
+            with col2:
+                stock_input = st.number_input("Jumlah Stok Masuk / Datang Baru", min_value=0.0, step=1.0)
+                cost_total_input = st.number_input("Total Nominal Belanja Pembelian Ini (Rp)", min_value=0.0, step=1000.0)
+            
+            btn_submit = st.form_submit_button("💾 Simpan Bahan Baku Datang", type="primary", use_container_width=True)
+
+        if btn_submit:
+            if stock_input > 0 and name:
+                new_cost_per_unit = cost_total_input / stock_input if stock_input > 0 else 0
                 img_path = save_uploaded_file(img_file)
-                c.execute("INSERT INTO raw_materials (name, unit, stock, cost_per_unit, image) VALUES (?, ?, ?, ?, ?)",
-                          (name, unit, stock, cost_per_unit, img_path))
-                conn.commit()
-                st.success(f"Bahan baku '{name}' berhasil disimpan!")
+
+                # CEK APAKAH BAHAN BAKU SUDAH ADA SEBELUMNYA (RESTOCK)
+                c.execute("SELECT id, stock, cost_per_unit, image FROM raw_materials WHERE LOWER(name)=LOWER(?)", (name.strip(),))
+                existing_item = c.fetchone()
+
+                if existing_item:
+                    # AKUMULASI STOK & HARGA UNTUK ITEM LAMA
+                    old_id, old_stock, old_cost, old_img = existing_item
+                    accumulated_stock = old_stock + stock_input
+                    final_img = img_path if img_path else old_img
+                    
+                    c.execute("UPDATE raw_materials SET stock=?, cost_per_unit=?, image=? WHERE id=?", 
+                              (accumulated_stock, new_cost_per_unit, final_img, old_id))
+                    conn.commit()
+                    st.success(f"✅ **Restock Berhasil!** Stok '{name}' otomatis bertambah +{stock_input} {unit} (Total Stok: {accumulated_stock:g} {unit}). Total Belanja Transaksi Ini: Rp {cost_total_input:,.0f}")
+                else:
+                    # INPUT SEBAGAI ITEM BAHAN BAKU BARU
+                    c.execute("INSERT INTO raw_materials (name, unit, stock, cost_per_unit, image) VALUES (?, ?, ?, ?, ?)",
+                              (name.strip(), unit, stock_input, new_cost_per_unit, img_path))
+                    conn.commit()
+                    st.success(f"✅ Bahan baku baru '{name}' berhasil tersimpan dengan total belanja Rp {cost_total_input:,.0f}!")
                 st.rerun()
             else:
-                st.error("Nama dan stok harus diisi!")
+                st.error("Nama bahan dan jumlah stok harus diisi!")
 
-    st.subheader("📋 Daftar Stok Bahan Baku Saat Ini")
+    # PANEL EDIT BAHAN BAKU SISI SAMPING (JIKA AKSI EDIT DIKLIK)
+    if 'edit_material_id' in st.session_state:
+        m_id = st.session_state['edit_material_id']
+        c.execute("SELECT * FROM raw_materials WHERE id=?", (m_id,))
+        m_curr = c.fetchone()
+        
+        if m_curr:
+            st.markdown("---")
+            with st.container(border=True):
+                st.subheader(f"✏️ Edit Bahan Baku: {m_curr[1]}")
+                col_em1, col_em2, col_em3 = st.columns(3)
+                with col_em1:
+                    e_m_name = st.text_input("Nama Bahan Baku", value=m_curr[1])
+                    e_m_unit = st.selectbox("Satuan", ["Gram", "ML", "Pcs", "Kg", "Liter"], index=["Gram", "ML", "Pcs", "Kg", "Liter"].index(m_curr[2]) if m_curr[2] in ["Gram", "ML", "Pcs", "Kg", "Liter"] else 0)
+                with col_em2:
+                    e_m_stock = st.number_input("Sisa Stok", value=float(m_curr[3]))
+                    e_m_cost = st.number_input("Harga Per Satuan / Cost per Unit (Rp)", value=float(m_curr[4]))
+                with col_em3:
+                    e_m_img = st.file_uploader("Ganti Gambar", type=["jpg", "png", "jpeg"])
+                    if m_curr[5] and os.path.exists(m_curr[5]):
+                        st.image(m_curr[5], width=60)
+                
+                b1, b2 = st.columns(2)
+                with b1:
+                    if st.button("💾 Simpan Perubahan Bahan", type="primary", use_container_width=True):
+                        new_m_img = save_uploaded_file(e_m_img) if e_m_img else m_curr[5]
+                        c.execute("UPDATE raw_materials SET name=?, unit=?, stock=?, cost_per_unit=?, image=? WHERE id=?",
+                                  (e_m_name, e_m_unit, e_m_stock, e_m_cost, new_m_img, m_id))
+                        conn.commit()
+                        del st.session_state['edit_material_id']
+                        st.success("Bahan baku berhasil diperbarui!")
+                        st.rerun()
+                with b2:
+                    if st.button("Batal Edit Bahan", use_container_width=True):
+                        del st.session_state['edit_material_id']
+                        st.rerun()
+
+    st.markdown("---")
+    st.subheader("📋 Daftar & Nilai Modal Bahan Baku Terendap")
     df_mats = pd.read_sql("SELECT * FROM raw_materials", conn)
     
     if not df_mats.empty:
-        df_display = df_mats.copy()
-        df_display['cost_per_unit_formatted'] = df_display['cost_per_unit'].apply(lambda x: f"Rp {x:,.2f}" if pd.notnull(x) else "Rp 0")
-        
-        st.dataframe(
-            df_display[['id', 'name', 'unit', 'stock', 'cost_per_unit_formatted', 'image']],
-            column_config={
-                "cost_per_unit_formatted": "Harga Satuan (Cost/Unit)",
-                "stock": "Sisa Stok",
-                "unit": "Satuan",
-                "name": "Nama Bahan Baku",
-                "image": "Path Gambar"
-            },
-            use_container_width=True,
-            hide_index=True
-        )
+        df_mats['nilai_terendap'] = df_mats['stock'] * df_mats['cost_per_unit']
 
-        st.markdown("---")
-        st.subheader("⚙️ Edit / Hapus Bahan Baku")
-        selected_id = st.selectbox("Pilih Bahan Baku yang Akan Diubah/Dihapus", df_mats['id'].tolist(), format_func=lambda x: df_mats[df_mats['id']==x]['name'].values[0])
+        # HEADER TABEL BAHAN BAKU
+        h_m1, h_m2, h_m3, h_m4, h_m5, h_m6, h_m7 = st.columns([0.8, 2.0, 1.0, 1.2, 1.5, 1.8, 1.2])
+        with h_m1: st.caption("**GAMBAR**")
+        with h_m2: st.caption("**NAMA BAHAN**")
+        with h_m3: st.caption("**SATUAN**")
+        with h_m4: st.caption("**SISA STOK**")
+        with h_m5: st.caption("**HARGA SATUAN**")
+        with h_m6: st.caption("**MODAL TERENDAP**")
+        with h_m7: st.caption("**AKSI**")
         
-        item_data = df_mats[df_mats['id'] == selected_id].iloc[0]
-        col_e1, col_e2, col_e3 = st.columns(3)
-        
-        with col_e1:
-            new_stock = st.number_input("Update Stok", value=float(item_data['stock']))
-        with col_e2:
-            new_cost_unit = st.number_input("Update Harga Satuan (Rp)", value=float(item_data['cost_per_unit']))
-        with col_e3:
-            st.write("Aksi:")
-            if st.button("💾 Update Data"):
-                c.execute("UPDATE raw_materials SET stock=?, cost_per_unit=? WHERE id=?", (new_stock, new_cost_unit, selected_id))
-                conn.commit()
-                st.success("Data berhasil diupdate!")
-                st.rerun()
-            if st.button("🗑️ Hapus Bahan"):
-                c.execute("DELETE FROM raw_materials WHERE id=?", (selected_id,))
-                conn.commit()
-                st.warning("Bahan baku berhasil dihapus!")
-                st.rerun()
+        st.divider()
+
+        # BARIS PER PRODUCT BAHAN BAKU DENGAN TOOLS DI KOLOM PALING UJUNG
+        for idx, row in df_mats.iterrows():
+            c_m1, c_m2, c_m3, c_m4, c_m5, c_m6, c_m7 = st.columns([0.8, 2.0, 1.0, 1.2, 1.5, 1.8, 1.2])
+            
+            with c_m1:
+                if row['image'] and os.path.exists(row['image']):
+                    st.image(row['image'], width=40)
+                else:
+                    st.markdown("📦")
+
+            with c_m2:
+                st.markdown(f"**{row['name']}**")
+
+            with c_m3:
+                st.write(row['unit'])
+
+            with c_m4:
+                st.write(f"{row['stock']:g}")
+
+            with c_m5:
+                cost_val = row['cost_per_unit'] if pd.notnull(row['cost_per_unit']) else 0
+                st.write(f"Rp {cost_val:,.2f}")
+
+            with c_m6:
+                nilai_terendap_val = row['nilai_terendap'] if pd.notnull(row['nilai_terendap']) else 0
+                st.markdown(f"**Rp {nilai_terendap_val:,.2f}**")
+
+            with c_m7:
+                act_m1, act_m2 = st.columns(2)
+                with act_m1:
+                    if st.button("✏️", key=f"edit_mat_btn_{row['id']}"):
+                        st.session_state['edit_material_id'] = row['id']
+                        st.rerun()
+                with act_m2:
+                    if st.button("❌", key=f"del_mat_btn_{row['id']}"):
+                        c.execute("DELETE FROM raw_materials WHERE id=?", (row['id'],))
+                        conn.commit()
+                        st.rerun()
+
+            st.markdown("<hr style='margin: 4px 0; border: 0.5px solid #f0f2f6;'>", unsafe_allow_html=True)
 
         low_stock = df_mats[df_mats['stock'] < 10]
         if not low_stock.empty:
@@ -503,7 +607,7 @@ elif menu == "🍔 Buat Produk & Kalkulasi HPP":
         p_sku = st.text_input("SKU / Barcode", placeholder="Contoh: DPT-000036 (Opsional)")
         p_name = st.text_input("Nama Produk Jualan")
     with col_p2:
-        p_category = st.selectbox("Kategori", ["Aksesoris", "Rumah Tangga", "Peralatan Olahraga", "Makanan/Minuman", "Lainnya"])
+        p_category = st.selectbox("Kategori Produk", LIST_KATEGORI)
         p_price = st.number_input("Harga Jual Produk (Rp)", min_value=0.0)
     with col_p3:
         p_stock = st.number_input("Stok Awal Jualan (Pcs)", min_value=1.0, value=100.0)
