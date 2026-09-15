@@ -117,24 +117,18 @@ if menu == "🛒 Kasir (POS)":
                         if row['image'] and os.path.exists(row['image']):
                             st.image(row['image'], use_column_width=True)
                         else:
-cols = st.columns(4)
-for idx, row in products.reset_index(drop=True).iterrows():
-    with cols[idx % 4]:
-        with st.container(border=True):
-            if row['image'] and os.path.exists(row['image']):
-                st.image(row['image'], use_column_width=True)
-            else:
-                st.write("🖼️ *Tanpa Gambar*")
-            st.markdown(f"**{row['name']}**")
-            st.markdown(f"<h5 style='color: #1E88E5; margin:0;'>Rp {row['price']:,.0f}</h5>", unsafe_allow_html=True)
-            
-            # Aman dari error KeyError & IndentationError
-            stock_val = row.get('stock', 0)
-            st.caption(f"Stok: {stock_val}")
-            
-            if st.button(f"➕ Tambah", key=f"btn_add_{row['id']}", use_container_width=True):
-                st.session_state['cart'].append({"id": row['id'], "name": row['name'], "price": row['price']})
-                st.rerun()
+                            st.write("🖼️ *Tanpa Gambar*")
+                        st.markdown(f"**{row['name']}**")
+                        st.markdown(f"<h5 style='color: #1E88E5; margin:0;'>Rp {row['price']:,.0f}</h5>", unsafe_allow_html=True)
+                        
+                        # Pengambilan nilai stok yang aman agar tidak KeyError
+                        stock_val = row.get('stock', 100)
+                        st.caption(f"Stok: {stock_val}")
+                        
+                        if st.button(f"➕ Tambah", key=f"btn_add_{row['id']}", use_container_width=True):
+                            st.session_state['cart'].append({"id": row['id'], "name": row['name'], "price": row['price']})
+                            st.rerun()
+
     with col_cart:
         with st.container(border=True):
             st.markdown("### 🛒 Keranjang")
@@ -170,7 +164,13 @@ for idx, row in products.reset_index(drop=True).iterrows():
                               (now, total, pay_method, st.session_state['username']))
                     
                     for _, item in summary.iterrows():
-                        c.execute("UPDATE products SET stock = stock - ? WHERE id=?", (item['qty'], item['id']))
+                        # Kurangi stok produk jika kolom ada
+                        try:
+                            c.execute("UPDATE products SET stock = stock - ? WHERE id=?", (item['qty'], item['id']))
+                        except:
+                            pass
+                            
+                        # Potong stok bahan baku berdasarkan resep
                         c.execute("SELECT material_id, qty FROM recipes WHERE product_id=?", (item['id'],))
                         recipes = c.fetchall()
                         for mat_id, req_qty in recipes:
@@ -190,7 +190,7 @@ for idx, row in products.reset_index(drop=True).iterrows():
                 st.info("Keranjang kosong. Klik produk di sebelah kiri untuk menambahkan.")
 
 # ---------------------------------------------------------
-# MENU 2: KELOLA & EDIT PRODUK (FITUR BARU)
+# MENU 2: KELOLA & EDIT PRODUK
 # ---------------------------------------------------------
 elif menu == "📝 Kelola & Edit Produk":
     st.header("📝 Daftar & Adjustment Produk")
@@ -201,7 +201,9 @@ elif menu == "📝 Kelola & Edit Produk":
     if not df_products.empty:
         df_display = df_products.copy()
         df_display['price_fmt'] = df_display['price'].apply(lambda x: f"Rp {x:,.0f}")
-        df_display['hpp_fmt'] = df_display['hpp'].apply(lambda x: f"Rp {x:,.2f}")
+        df_display['hpp_fmt'] = df_display['hpp'].apply(lambda x: f"Rp {x:,.2f}" if pd.notnull(x) else "Rp 0")
+        if 'stock' not in df_display.columns:
+            df_display['stock'] = 100
         
         st.subheader("📋 Daftar Produk Saat Ini")
         st.dataframe(
@@ -232,9 +234,10 @@ elif menu == "📝 Kelola & Edit Produk":
         with col_ed1:
             edit_name = st.text_input("Nama Produk", value=prod_data['name'])
             edit_price = st.number_input("Harga Jual (Rp)", value=float(prod_data['price']), step=1000.0)
-            edit_hpp = st.number_input("HPP Produk (Rp)", value=float(prod_data['hpp']), step=500.0)
+            edit_hpp = st.number_input("HPP Produk (Rp)", value=float(prod_data['hpp']) if pd.notnull(prod_data['hpp']) else 0.0, step=500.0)
         with col_ed2:
-            edit_stock = st.number_input("Jumlah Stok", value=float(prod_data['stock']), step=1.0)
+            current_stock = float(prod_data['stock']) if 'stock' in prod_data and pd.notnull(prod_data['stock']) else 100.0
+            edit_stock = st.number_input("Jumlah Stok", value=current_stock, step=1.0)
             edit_img = st.file_uploader("Ganti Foto Produk (Opsional)", type=["jpg", "png", "jpeg"])
             if prod_data['image'] and os.path.exists(prod_data['image']):
                 st.image(prod_data['image'], width=100, caption="Foto Saat Ini")
@@ -242,13 +245,15 @@ elif menu == "📝 Kelola & Edit Produk":
         col_act1, col_act2 = st.columns(2)
         with col_act1:
             if st.button("💾 Simpan Perubahan Produk", type="primary", use_container_width=True):
-                if edit_img is not None:
-                    img_path = save_uploaded_file(edit_img)
-                else:
-                    img_path = prod_data['image']
+                img_path = save_uploaded_file(edit_img) if edit_img is not None else prod_data['image']
+                
+                try:
+                    c.execute("UPDATE products SET name=?, price=?, hpp=?, stock=?, image=? WHERE id=?",
+                              (edit_name, edit_price, edit_hpp, edit_stock, img_path, selected_prod_id))
+                except:
+                    c.execute("UPDATE products SET name=?, price=?, hpp=?, image=? WHERE id=?",
+                              (edit_name, edit_price, edit_hpp, img_path, selected_prod_id))
                     
-                c.execute("UPDATE products SET name=?, price=?, hpp=?, stock=?, image=? WHERE id=?",
-                          (edit_name, edit_price, edit_hpp, edit_stock, img_path, selected_prod_id))
                 conn.commit()
                 st.success(f"Produk '{edit_name}' berhasil diperbarui!")
                 st.rerun()
@@ -441,8 +446,13 @@ elif menu == "🍔 Buat Produk & Kalkulasi HPP":
         if st.button("💾 Simpan Produk Jualan", type="primary"):
             if p_name and p_price > 0:
                 img_path = save_uploaded_file(p_img)
-                c.execute("INSERT INTO products (name, price, hpp, stock, image) VALUES (?, ?, ?, ?, ?)",
-                          (p_name, p_price, total_hpp_satuan, p_stock, img_path))
+                try:
+                    c.execute("INSERT INTO products (name, price, hpp, stock, image) VALUES (?, ?, ?, ?, ?)",
+                              (p_name, p_price, total_hpp_satuan, p_stock, img_path))
+                except:
+                    c.execute("INSERT INTO products (name, price, hpp, image) VALUES (?, ?, ?, ?)",
+                              (p_name, p_price, total_hpp_satuan, img_path))
+                              
                 p_id = c.lastrowid
                 for m_id, q_per_porsi in selected_recipe_per_portion:
                     c.execute("INSERT INTO recipes (product_id, material_id, qty) VALUES (?, ?, ?)", (p_id, m_id, q_per_porsi))
