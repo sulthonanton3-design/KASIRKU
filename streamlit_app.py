@@ -1,24 +1,3 @@
-import streamlit as st
-import streamlit.components.v1 as components
-
-st.set_page_config(
-    page_title="KASIRKU - POS & Inventory System",
-    page_icon="🛒",
-    layout="wide"
-)
-
-st.markdown("""
-    <style>
-        .block-container {
-            padding: 0rem !important;
-            max-width: 100% !important;
-        }
-        header {visibility: hidden;}
-        footer {visibility: hidden;}
-    </style>
-""", unsafe_allow_html=True)
-
-html_code = """
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -37,7 +16,7 @@ html_code = """
     <div class="flex h-screen overflow-hidden">
 
         <!-- SIDEBAR NAVIGASI -->
-        <aside class="w-64 bg-white border-r border-slate-200 flex flex-col justify-between shadow-sm">
+        <aside class="w-64 bg-white border-r border-slate-200 flex flex-col justify-between shadow-sm flex-shrink-0">
             <div>
                 <div class="p-4 border-b border-slate-100 flex items-center gap-3">
                     <div class="p-2 bg-blue-600 text-white rounded-lg">
@@ -82,6 +61,23 @@ html_code = """
                         </button>
                         <button onclick="switchTab('stock-bahan')" id="btn-stock-bahan" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
                             <i data-lucide="layers" class="w-4 h-4"></i> Akumulasi Stock Bahan
+                        </button>
+                    </div>
+
+                    <!-- LAPORAN (DITAMBAHKAN) -->
+                    <div class="space-y-1">
+                        <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 pt-2">Laporan</div>
+                        <button onclick="switchTab('report-daily')" id="btn-report-daily" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
+                            <i data-lucide="calendar" class="w-4 h-4"></i> Penjualan Harian
+                        </button>
+                        <button onclick="switchTab('report-tx')" id="btn-report-tx" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
+                            <i data-lucide="receipt" class="w-4 h-4"></i> Transaksi (Metode)
+                        </button>
+                        <button onclick="switchTab('report-cashflow')" id="btn-report-cashflow" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
+                            <i data-lucide="arrow-left-right" class="w-4 h-4"></i> Cashflow & Pengeluaran
+                        </button>
+                        <button onclick="switchTab('report-pnl')" id="btn-report-pnl" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
+                            <i data-lucide="pie-chart" class="w-4 h-4"></i> Laporan PnL Lengkap
                         </button>
                     </div>
 
@@ -361,7 +357,184 @@ html_code = """
                 </div>
             </section>
 
-            <!-- TAB 7: PENGATURAN OVERHEAD -->
+            <!-- TAB 7: LAPORAN PENJUALAN HARIAN -->
+            <section id="tab-report-daily" class="tab-content hidden">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800">Laporan Penjualan Harian</h2>
+                        <p class="text-sm text-slate-500">Ringkasan transaksi berdasarkan tanggal.</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-50 border-b text-xs font-semibold text-slate-500 uppercase">
+                            <tr>
+                                <th class="p-4">Tanggal</th>
+                                <th class="p-4">Jumlah Transaksi</th>
+                                <th class="p-4">Item Terjual</th>
+                                <th class="p-4">Total Omset (Rp)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="daily-report-table-body" class="divide-y text-sm"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- TAB 8: LAPORAN TRANSAKSI DETAIL (CASH / TF / EWALLET) -->
+            <section id="tab-report-tx" class="tab-content hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-slate-800">Laporan Transaksi Pembayaran</h2>
+                    <p class="text-sm text-slate-500">Rincian metode pembayaran Cash, Transfer, dan E-Wallet.</p>
+                </div>
+                <div class="grid grid-cols-3 gap-4 mb-6">
+                    <div class="bg-white p-4 rounded-xl border shadow-sm">
+                        <p class="text-xs text-slate-400 font-semibold">TOTAL CASH</p>
+                        <p id="tx-total-cash" class="text-xl font-bold text-emerald-600 mt-1">Rp 0</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border shadow-sm">
+                        <p class="text-xs text-slate-400 font-semibold">TOTAL TRANSFER</p>
+                        <p id="tx-total-transfer" class="text-xl font-bold text-blue-600 mt-1">Rp 0</p>
+                    </div>
+                    <div class="bg-white p-4 rounded-xl border shadow-sm">
+                        <p class="text-xs text-slate-400 font-semibold">TOTAL E-WALLET</p>
+                        <p id="tx-total-ewallet" class="text-xl font-bold text-purple-600 mt-1">Rp 0</p>
+                    </div>
+                </div>
+                <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                    <table class="w-full text-left border-collapse">
+                        <thead class="bg-slate-50 border-b text-xs font-semibold text-slate-500 uppercase">
+                            <tr>
+                                <th class="p-4">ID / Waktu</th>
+                                <th class="p-4">Detail Items</th>
+                                <th class="p-4">Metode</th>
+                                <th class="p-4">Subtotal</th>
+                                <th class="p-4">PPN</th>
+                                <th class="p-4">Total Bayar</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tx-report-table-body" class="divide-y text-sm"></tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- TAB 9: LAPORAN CASHFLOW & PENGELUARAN -->
+            <section id="tab-report-cashflow" class="tab-content hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-slate-800">Cashflow & Input Pengeluaran</h2>
+                    <p class="text-sm text-slate-500">Pencatatan pengeluaran operasional, belanja bahan baku, dan pembelian aset.</p>
+                </div>
+                <div class="grid grid-cols-3 gap-6">
+                    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                        <h3 class="font-bold border-b pb-2 text-slate-800">Input Pengeluaran Baru</h3>
+                        <div>
+                            <label class="block text-xs font-semibold mb-1">Kategori Pengeluaran</label>
+                            <select id="expense-category" class="w-full border rounded-lg p-2 text-sm">
+                                <option value="Bahan Baku">Belanja Bahan Baku</option>
+                                <option value="Operasional">Operasional (Gaji, Listrik, Sewa, dll)</option>
+                                <option value="Asset">Pembelian Asset / Peralatan</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold mb-1">Deskripsi / Keterangan</label>
+                            <input type="text" id="expense-desc" placeholder="Contoh: Bayar Listrik Bulan Ini" class="w-full border rounded-lg p-2 text-sm">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold mb-1">Nominal (Rp)</label>
+                            <input type="number" id="expense-amount" placeholder="Rp 0" class="w-full border rounded-lg p-2 text-sm">
+                        </div>
+                        <button onclick="saveExpense()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg text-sm transition">Simpan Pengeluaran</button>
+                    </div>
+
+                    <div class="col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                        <div class="p-4 border-b font-bold text-slate-800">Riwayat Pengeluaran (Arus Kas Keluar)</div>
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-50 border-b text-xs font-semibold text-slate-500 uppercase">
+                                <tr>
+                                    <th class="p-3">Tanggal</th>
+                                    <th class="p-3">Kategori</th>
+                                    <th class="p-3">Keterangan</th>
+                                    <th class="p-3 text-right">Nominal</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expense-table-body" class="divide-y text-sm"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 10: LAPORAN PnL (LABA RUGI LENGKAP) -->
+            <section id="tab-report-pnl" class="tab-content hidden">
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-slate-800">Laporan PnL (Laba & Rugi Transparan)</h2>
+                    <p class="text-sm text-slate-500">Evaluasi total aset, modal terpakai, biaya operasional, dan laba bersih usaha.</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                        <h3 class="font-bold text-slate-800 border-b pb-2">1. Nilai Persediaan / Stok (Asset Tersimpan)</h3>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-600">Nilai Bahan Baku Belum Terolah:</span>
+                            <span id="pnl-raw-value" class="font-bold text-slate-800">Rp 0</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-600">Nilai Produk Siap Jual (Belum Terjual):</span>
+                            <span id="pnl-unsold-product-value" class="font-bold text-slate-800">Rp 0</span>
+                        </div>
+                        <div class="flex justify-between text-sm border-t pt-2 font-bold text-blue-600">
+                            <span>Total Portfolio Stok:</span>
+                            <span id="pnl-total-asset-value">Rp 0</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-3">
+                        <h3 class="font-bold text-slate-800 border-b pb-2">2. Pendapatan (Penjualan Terrealisasi)</h3>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-600">Total Omset Penjualan Bersih (Tanpa PPN):</span>
+                            <span id="pnl-omset" class="font-bold text-emerald-600">Rp 0</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-600">Modal Bahan Baku Produk Terjual (COGS):</span>
+                            <span id="pnl-cogs" class="font-semibold text-red-500">- Rp 0</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-600">Alokasi Biaya Overhead HPP:</span>
+                            <span id="pnl-overhead" class="font-semibold text-amber-600">- Rp 0</span>
+                        </div>
+                        <div class="flex justify-between text-sm border-t pt-2 font-bold text-slate-800">
+                            <span>Laba Kotor Penjualan:</span>
+                            <span id="pnl-gross-profit" class="text-emerald-700">Rp 0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
+                    <h3 class="font-bold text-slate-800 border-b pb-2">3. Pengeluaran Tambahan & Profit Bersih</h3>
+                    <div class="grid grid-cols-3 gap-4 text-sm">
+                        <div class="p-3 bg-slate-50 rounded-lg">
+                            <span class="text-slate-500 text-xs">Belanja Bahan Baku</span>
+                            <p id="pnl-exp-bahan" class="font-bold text-slate-700 mt-1">Rp 0</p>
+                        </div>
+                        <div class="p-3 bg-slate-50 rounded-lg">
+                            <span class="text-slate-500 text-xs">Biaya Operasional</span>
+                            <p id="pnl-exp-ops" class="font-bold text-slate-700 mt-1">Rp 0</p>
+                        </div>
+                        <div class="p-3 bg-slate-50 rounded-lg">
+                            <span class="text-slate-500 text-xs">Pembelian Asset</span>
+                            <p id="pnl-exp-asset" class="font-bold text-slate-700 mt-1">Rp 0</p>
+                        </div>
+                    </div>
+
+                    <div class="border-t pt-4 flex justify-between items-center">
+                        <div>
+                            <p class="text-lg font-bold text-slate-800">NET PROFIT / LABA BERSIH</p>
+                            <p class="text-xs text-slate-400">Laba Kotor Penjualan dikurangi Pengeluaran Operasional & Aset</p>
+                        </div>
+                        <span id="pnl-net-profit" class="text-3xl font-extrabold text-blue-600">Rp 0</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 11: PENGATURAN OVERHEAD -->
             <section id="tab-set-overhead" class="tab-content hidden">
                 <h2 class="text-2xl font-bold text-slate-800 mb-6">Pengaturan Persentase Overhead & PPN</h2>
                 <div class="bg-white p-6 rounded-xl border max-w-md space-y-4 shadow-sm">
@@ -424,6 +597,10 @@ html_code = """
         let selectedPayMethod = 'cash';
         let cart = [];
 
+        // DATA TRANSAKSI & PENGELUARAN
+        let transactionsList = [];
+        let expensesList = [];
+
         let products = [
             { id: 1, nama: 'Kopi Susu Gula Aren', kategori: 'Minuman', harga: 18000, stok: 25, status: 'Ready', gambar: 'https://images.unsplash.com/photo-1541167760496-1628856ab772?w=300' },
             { id: 2, nama: 'Roti Bakar Cokelat', kategori: 'Makanan', harga: 15000, stok: 0, status: 'Habis', gambar: 'https://images.unsplash.com/photo-1584776296944-ab6fb57b0bff?w=300' }
@@ -461,9 +638,13 @@ html_code = """
             if (tabId === 'master-racikan') initRacikanTab();
             if (tabId === 'stock-product') renderStockProductTable();
             if (tabId === 'stock-bahan') renderStockBahanTable();
+            if (tabId === 'report-daily') renderDailyReport();
+            if (tabId === 'report-tx') renderTxReport();
+            if (tabId === 'report-cashflow') renderExpenseTable();
+            if (tabId === 'report-pnl') renderPnLReport();
         }
 
-        // POS
+        // POS FUNCTIONS
         function renderPosProducts(filter = "") {
             const grid = document.getElementById('pos-products-grid');
             grid.innerHTML = "";
@@ -536,15 +717,25 @@ html_code = """
                             <p class="font-semibold text-slate-700 text-xs">${item.nama}</p>
                             <p class="text-[10px] text-slate-400">Rp ${item.harga.toLocaleString('id-ID')} x ${item.qty}</p>
                         </div>
-                        <div class="flex items-center gap-1">
-                            <button onclick="updateCartQty(${item.id}, -1)" class="w-5 h-5 bg-slate-200 rounded text-xs font-bold text-slate-600 hover:bg-slate-300">-</button>
-                            <span class="text-xs font-semibold w-4 text-center">${item.qty}</span>
-                            <button onclick="updateCartQty(${item.id}, 1)" class="w-5 h-5 bg-slate-200 rounded text-xs font-bold text-slate-600 hover:bg-slate-300">+</button>
+                        <div class="flex items-center gap-2">
+                            <button onclick="updateCartQty(${item.id}, -1)" class="w-5 h-5 bg-slate-200 rounded text-xs font-bold flex items-center justify-center">-</button>
+                            <span class="text-xs font-semibold">${item.qty}</span>
+                            <button onclick="updateCartQty(${item.id}, 1)" class="w-5 h-5 bg-slate-200 rounded text-xs font-bold flex items-center justify-center">+</button>
                         </div>
                     </div>
                 `).join('');
             }
-            calculateTotals();
+
+            const subtotal = cart.reduce((sum, item) => sum + (item.harga * item.qty), 0);
+            const ppn = subtotal * (ppnRate / 100);
+            const total = subtotal + ppn;
+
+            document.getElementById('pos-subtotal').innerText = 'Rp ' + subtotal.toLocaleString('id-ID');
+            document.getElementById('pos-ppn-rate').innerText = ppnRate;
+            document.getElementById('pos-ppn').innerText = 'Rp ' + ppn.toLocaleString('id-ID');
+            document.getElementById('pos-total').innerText = 'Rp ' + total.toLocaleString('id-ID');
+
+            calculateChange();
         }
 
         function setPaymentMethod(method) {
@@ -552,104 +743,140 @@ html_code = """
             document.querySelectorAll('.pay-method-btn').forEach(btn => {
                 btn.className = "pay-method-btn bg-slate-100 text-slate-600 text-xs py-1.5 rounded font-medium";
             });
-            document.getElementById(`pay-btn-${method}`).className = "pay-method-btn bg-blue-600 text-white text-xs py-1.5 rounded font-medium";
-            document.getElementById('cash-payment-section').classList.toggle('hidden', method !== 'cash');
-        }
+            const activeBtn = document.getElementById('pay-btn-' + method);
+            if (activeBtn) activeBtn.className = "pay-method-btn bg-blue-600 text-white text-xs py-1.5 rounded font-medium";
 
-        function calculateTotals() {
-            const subtotal = cart.reduce((sum, item) => sum + (item.harga * item.qty), 0);
-            const ppn = Math.round(subtotal * (ppnRate / 100));
-            const total = subtotal + ppn;
-
-            document.getElementById('pos-subtotal').innerText = `Rp ${subtotal.toLocaleString('id-ID')}`;
-            document.getElementById('pos-ppn-rate').innerText = ppnRate;
-            document.getElementById('pos-ppn').innerText = `Rp ${ppn.toLocaleString('id-ID')}`;
-            document.getElementById('pos-total').innerText = `Rp ${total.toLocaleString('id-ID')}`;
-            calculateChange();
+            const cashSection = document.getElementById('cash-payment-section');
+            if (method === 'cash') cashSection.classList.remove('hidden');
+            else cashSection.classList.add('hidden');
         }
 
         function calculateChange() {
-            const total = cart.reduce((sum, item) => sum + (item.harga * item.qty), 0) * (1 + ppnRate / 100);
-            const paid = parseFloat(document.getElementById('cash-paid').value) || 0;
-            const change = paid - total;
-            const changeDisplay = document.getElementById('cash-change');
-            if (change >= 0) {
-                changeDisplay.innerText = `Rp ${Math.round(change).toLocaleString('id-ID')}`;
-                changeDisplay.className = "font-bold text-emerald-600";
-            } else {
-                changeDisplay.innerText = `Kurang Rp ${Math.abs(Math.round(change)).toLocaleString('id-ID')}`;
-                changeDisplay.className = "font-bold text-red-500";
-            }
+            const subtotal = cart.reduce((sum, item) => sum + (item.harga * item.qty), 0);
+            const total = subtotal + (subtotal * (ppnRate / 100));
+            const cashPaid = parseFloat(document.getElementById('cash-paid').value) || 0;
+            const change = cashPaid - total;
+
+            document.getElementById('cash-change').innerText = 'Rp ' + (change > 0 ? change.toLocaleString('id-ID') : '0');
         }
 
-        // PROSES TRANSAKSI & KURANGI STOK BAHAN SECARA OTOMATIS
         function processTransaction() {
             if (cart.length === 0) {
-                alert("Keranjang belanja masih kosong!");
+                alert("Keranjang masih kosong!");
                 return;
             }
 
-            // Kurangi Stok Product dan Akumulasi Bahan Baku
-            cart.forEach(cartItem => {
-                const prod = products.find(p => p.id === cartItem.id);
+            const subtotal = cart.reduce((sum, item) => sum + (item.harga * item.qty), 0);
+            const ppn = subtotal * (ppnRate / 100);
+            const total = subtotal + ppn;
+
+            if (selectedPayMethod === 'cash') {
+                const cashPaid = parseFloat(document.getElementById('cash-paid').value) || 0;
+                if (cashPaid < total) {
+                    alert("Uang pembayaran kurang!");
+                    return;
+                }
+            }
+
+            let txCogs = 0;
+            let txOverhead = 0;
+
+            // Potong Stok Produk & hitung HPP modal produk terjual
+            cart.forEach(item => {
+                const prod = products.find(p => p.id === item.id);
                 if (prod) {
-                    prod.stok -= cartItem.qty;
+                    prod.stok -= item.qty;
                     if (prod.stok <= 0) {
                         prod.stok = 0;
                         prod.status = 'Habis';
                     }
                 }
 
-                // Pengurangan Stok Bahan berdasarkan Resep Produk
-                const recipe = recipesList.find(r => r.productId === cartItem.id);
+                const recipe = recipesList.find(r => r.productId === item.id);
                 if (recipe) {
+                    let itemRawHpp = 0;
                     recipe.komposisi.forEach(comp => {
                         const bahan = bahanBakuList.find(b => b.id === comp.bahanId);
                         if (bahan) {
-                            const neededTotal = comp.qty * cartItem.qty;
-                            bahan.sisaStok = Math.max(0, bahan.sisaStok - neededTotal);
+                            itemRawHpp += (bahan.hargaGlobal * comp.qty);
+                            bahan.sisaStok -= (comp.qty * item.qty);
+                            if (bahan.sisaStok < 0) bahan.sisaStok = 0;
                         }
                     });
+                    txCogs += (itemRawHpp * item.qty);
+                    txOverhead += (itemRawHpp * (overheadRate / 100) * item.qty);
                 }
             });
 
-            alert("Transaksi Berhasil! Stok Produk & Bahan Baku Otomatis Terkurangi.");
+            // Catat Riwayat Transaksi Laporan
+            const today = new Date().toISOString().split('T')[0];
+            const now = new Date().toLocaleTimeString('id-ID');
+
+            transactionsList.push({
+                id: 'TRX-' + Date.now(),
+                tanggal: today,
+                waktu: now,
+                items: JSON.parse(JSON.stringify(cart)),
+                metode: selectedPayMethod,
+                subtotal: subtotal,
+                ppn: ppn,
+                total: total,
+                cogs: txCogs,
+                overhead: txOverhead
+            });
+
+            alert("Transaksi Berhasil Diproses!");
             clearCart();
             document.getElementById('cash-paid').value = "";
             renderPosProducts();
         }
 
-        // MASTER PRODUCTS
+        // MASTER PRODUCT FUNCTIONS
         function renderProductTable() {
             const tbody = document.getElementById('product-table-body');
             tbody.innerHTML = products.map(p => `
                 <tr class="hover:bg-slate-50">
-                    <td class="p-4"><img src="${p.gambar || 'https://via.placeholder.com/50'}" class="w-10 h-10 object-cover rounded border"></td>
+                    <td class="p-4"><img src="${p.gambar || 'https://via.placeholder.com/50'}" class="w-12 h-12 object-cover rounded-lg border"></td>
                     <td class="p-4 font-semibold text-slate-800">${p.nama}</td>
                     <td class="p-4 text-slate-500">${p.kategori}</td>
                     <td class="p-4 font-medium text-slate-700">Rp ${p.harga.toLocaleString('id-ID')}</td>
-                    <td class="p-4"><span class="px-2.5 py-1 text-xs rounded-full font-semibold ${p.status === 'Ready' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">${p.status}</span></td>
+                    <td class="p-4"><span class="text-xs px-2.5 py-1 rounded-full font-semibold ${p.status === 'Ready' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">${p.status}</span></td>
                     <td class="p-4 text-right">
-                        <button onclick="editProduct(${p.id})" class="text-blue-600 hover:underline text-xs font-semibold mr-2">Edit</button>
-                        <button onclick="deleteProduct(${p.id})" class="text-red-500 hover:underline text-xs font-semibold">Hapus</button>
+                        <button onclick="openProductModal(${p.id})" class="text-blue-600 hover:underline text-xs font-semibold mr-2">Edit</button>
+                        <button onclick="deleteProduct(${p.id})" class="text-red-600 hover:underline text-xs font-semibold">Hapus</button>
                     </td>
                 </tr>
             `).join('');
         }
 
-        function openProductModal() {
-            document.getElementById('modal-product-id').value = "";
-            document.getElementById('modal-nama').value = "";
-            document.getElementById('modal-harga').value = "";
-            document.getElementById('modal-gambar').value = "";
-            document.getElementById('modal-title').innerText = "Tambah Produk Baru";
-            document.getElementById('product-modal').classList.remove('hidden');
-            document.getElementById('product-modal').classList.add('flex');
+        function openProductModal(productId = null) {
+            const modal = document.getElementById('product-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            if (productId) {
+                const p = products.find(item => item.id === productId);
+                document.getElementById('modal-title').innerText = "Edit Produk";
+                document.getElementById('modal-product-id').value = p.id;
+                document.getElementById('modal-nama').value = p.nama;
+                document.getElementById('modal-kategori').value = p.kategori;
+                document.getElementById('modal-harga').value = p.harga;
+                document.getElementById('modal-gambar').value = p.gambar;
+                document.getElementById('modal-status').value = p.status;
+            } else {
+                document.getElementById('modal-title').innerText = "Tambah Produk Baru";
+                document.getElementById('modal-product-id').value = "";
+                document.getElementById('modal-nama').value = "";
+                document.getElementById('modal-harga').value = "";
+                document.getElementById('modal-gambar').value = "";
+                document.getElementById('modal-status').value = "Ready";
+            }
         }
 
         function closeProductModal() {
-            document.getElementById('product-modal').classList.add('hidden');
-            document.getElementById('product-modal').classList.remove('flex');
+            const modal = document.getElementById('product-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
         }
 
         function saveProductForm() {
@@ -661,55 +888,81 @@ html_code = """
             const status = document.getElementById('modal-status').value;
 
             if (!nama || harga <= 0) {
-                alert("Mohon isi nama dan harga produk.");
+                alert("Harap isi nama dan harga produk dengan benar!");
                 return;
             }
 
             if (id) {
-                const p = products.find(x => x.id == id);
+                const p = products.find(item => item.id == id);
                 if (p) {
                     p.nama = nama; p.kategori = kategori; p.harga = harga; p.gambar = gambar; p.status = status;
                 }
             } else {
-                products.push({ id: Date.now(), nama, kategori, harga, stok: 0, status, gambar });
+                const newId = products.length ? Math.max(...products.map(p => p.id)) + 1 : 1;
+                products.push({ id: newId, nama, kategori, harga, stok: 0, status, gambar });
             }
+
             closeProductModal();
             renderProductTable();
         }
 
-        // BAHAN BAKU
-        function calcBahanGlobal() {
-            const vol = parseFloat(document.getElementById('bahan-volume').value) || 0;
-            const qty = parseFloat(document.getElementById('bahan-qty').value) || 0;
-            const price = parseFloat(document.getElementById('bahan-harga-pack').value) || 0;
-            const totalSpend = qty * price;
-            const totalVol = vol * qty;
-            const globalUnit = totalVol > 0 ? (totalSpend / totalVol) : 0;
+        function deleteProduct(productId) {
+            if (confirm("Apakah Anda yakin ingin menghapus produk ini?")) {
+                products = products.filter(p => p.id !== productId);
+                recipesList = recipesList.filter(r => r.productId !== productId);
+                renderProductTable();
+            }
+        }
 
-            document.getElementById('bahan-total-spend').innerText = `Rp ${totalSpend.toLocaleString('id-ID')}`;
-            document.getElementById('bahan-harga-global').innerText = `Rp ${globalUnit.toFixed(2)} / Satuan`;
+        // INPUT BAHAN BAKU FUNCTIONS
+        function calcBahanGlobal() {
+            const volume = parseFloat(document.getElementById('bahan-volume').value) || 0;
+            const qty = parseFloat(document.getElementById('bahan-qty').value) || 0;
+            const hargaPack = parseFloat(document.getElementById('bahan-harga-pack').value) || 0;
+
+            const totalSpend = qty * hargaPack;
+            const totalVolume = volume * qty;
+            const hargaGlobal = totalVolume > 0 ? totalSpend / totalVolume : 0;
+
+            document.getElementById('bahan-total-spend').innerText = 'Rp ' + totalSpend.toLocaleString('id-ID');
+            document.getElementById('bahan-harga-global').innerText = 'Rp ' + Math.round(hargaGlobal).toLocaleString('id-ID') + ' / Satuan';
         }
 
         function saveBahanBaku() {
             const nama = document.getElementById('bahan-nama').value;
             const satuan = document.getElementById('bahan-satuan').value;
-            const vol = parseFloat(document.getElementById('bahan-volume').value) || 0;
+            const volume = parseFloat(document.getElementById('bahan-volume').value) || 0;
             const qty = parseFloat(document.getElementById('bahan-qty').value) || 0;
-            const price = parseFloat(document.getElementById('bahan-harga-pack').value) || 0;
+            const hargaPack = parseFloat(document.getElementById('bahan-harga-pack').value) || 0;
 
-            if (!nama || vol <= 0 || qty <= 0 || price <= 0) {
-                alert("Mohon lengkapi formulir bahan baku.");
+            if (!nama || volume <= 0 || qty <= 0 || hargaPack <= 0) {
+                alert("Harap lengkapi semua data bahan baku dengan benar!");
                 return;
             }
 
-            const totalVol = vol * qty;
-            const hargaGlobal = (qty * price) / totalVol;
+            const totalVolume = volume * qty;
+            const hargaGlobal = (qty * hargaPack) / totalVolume;
+            const newId = bahanBakuList.length ? Math.max(...bahanBakuList.map(b => b.id)) + 1 : 1;
 
             bahanBakuList.push({
-                id: Date.now(), nama, satuan, totalStok: totalVol, sisaStok: totalVol, hargaGlobal
+                id: newId,
+                nama: nama,
+                satuan: satuan,
+                totalStok: totalVolume,
+                sisaStok: totalVolume,
+                hargaGlobal: hargaGlobal
             });
 
-            alert("Bahan baku berhasil disimpan ke Akumulasi Stok!");
+            // Catat otomatis ke Cashflow / Pengeluaran Kategori Bahan Baku
+            const today = new Date().toISOString().split('T')[0];
+            expensesList.push({
+                tanggal: today,
+                kategori: 'Bahan Baku',
+                keterangan: `Beli ${nama} (${qty} pack)`,
+                nominal: qty * hargaPack
+            });
+
+            alert("Bahan Baku Berhasil Disimpan & Dicatat ke Cashflow!");
             document.getElementById('bahan-nama').value = "";
             document.getElementById('bahan-volume').value = "";
             document.getElementById('bahan-qty').value = "";
@@ -717,141 +970,327 @@ html_code = """
             calcBahanGlobal();
         }
 
-        // RACIKAN & PRODUCTION
+        // PEMBUATAN PRODUCT (RACIKAN & PRODUKSI)
         function initRacikanTab() {
             const select = document.getElementById('recipe-product-select');
             select.innerHTML = `<option value="">-- Pilih Produk --</option>` + products.map(p => `<option value="${p.id}">${p.nama}</option>`).join('');
-            
-            const container = document.getElementById('recipe-rows-container');
-            if (container.children.length === 0) addRecipeRow();
+            document.getElementById('recipe-rows-container').innerHTML = "";
+            calculateHPP();
         }
 
-        function addRecipeRow() {
+        function addRecipeRow(bahanId = "", qty = 0) {
             const container = document.getElementById('recipe-rows-container');
             const rowId = Date.now() + Math.random();
             const div = document.createElement('div');
             div.className = "flex items-center gap-3 recipe-row";
-            div.id = `row-${rowId}`;
+            div.id = 'row-' + rowId;
+
+            const options = bahanBakuList.map(b => `<option value="${b.id}" ${b.id == bahanId ? 'selected' : ''}>${b.nama} (${b.satuan}) - Rp ${Math.round(b.hargaGlobal)}/${b.satuan}</option>`).join('');
+
             div.innerHTML = `
-                <select onchange="calculateHPP()" class="recipe-bahan-select flex-1 border rounded-lg p-2 text-sm">
+                <select class="recipe-bahan-select w-full border rounded-lg p-2 text-sm" onchange="calculateHPP()">
                     <option value="">-- Pilih Bahan Baku --</option>
-                    ${bahanBakuList.map(b => `<option value="${b.id}">${b.nama} (${b.satuan})</option>`).join('')}
+                    ${options}
                 </select>
-                <input type="number" oninput="calculateHPP()" placeholder="Takaran/Porsi" class="recipe-qty-input w-36 border rounded-lg p-2 text-sm">
-                <button onclick="removeRecipeRow('row-${rowId}')" class="text-red-500 font-bold px-2">✕</button>
+                <input type="number" value="${qty}" placeholder="Qty/Porsi" oninput="calculateHPP()" class="recipe-qty-input w-32 border rounded-lg p-2 text-sm">
+                <button onclick="removeRecipeRow('${rowId}')" class="text-red-500 font-bold px-2">X</button>
             `;
             container.appendChild(div);
+            calculateHPP();
         }
 
         function removeRecipeRow(rowId) {
-            document.getElementById(rowId)?.remove();
+            const el = document.getElementById('row-' + rowId);
+            if (el) el.remove();
             calculateHPP();
         }
 
         function calculateHPP() {
-            const productId = document.getElementById('recipe-product-select').value;
-            const product = products.find(p => p.id == productId);
+            document.getElementById('overhead-rate-display').innerText = overheadRate;
+            const productId = parseInt(document.getElementById('recipe-product-select').value);
+            const product = products.find(p => p.id === productId);
 
-            let totalRawCost = 0;
+            let rawHpp = 0;
             document.querySelectorAll('.recipe-row').forEach(row => {
-                const bahanId = row.querySelector('.recipe-bahan-select').value;
+                const bahanId = parseInt(row.querySelector('.recipe-bahan-select').value);
                 const qty = parseFloat(row.querySelector('.recipe-qty-input').value) || 0;
-                const bahan = bahanBakuList.find(b => b.id == bahanId);
-                if (bahan) totalRawCost += (bahan.hargaGlobal * qty);
+                const bahan = bahanBakuList.find(b => b.id === bahanId);
+                if (bahan) {
+                    rawHpp += (bahan.hargaGlobal * qty);
+                }
             });
 
-            const overheadVal = totalRawCost * (overheadRate / 100);
-            const totalHppFinal = totalRawCost + overheadVal;
+            const overheadVal = rawHpp * (overheadRate / 100);
+            const totalHpp = rawHpp + overheadVal;
 
-            document.getElementById('hpp-bahan-raw').innerText = `Rp ${Math.round(totalRawCost).toLocaleString('id-ID')}`;
-            document.getElementById('overhead-rate-display').innerText = overheadRate;
-            document.getElementById('hpp-overhead-val').innerText = `Rp ${Math.round(overheadVal).toLocaleString('id-ID')}`;
-            document.getElementById('hpp-total-final').innerText = `Rp ${Math.round(totalHppFinal).toLocaleString('id-ID')}`;
+            document.getElementById('hpp-bahan-raw').innerText = 'Rp ' + Math.round(rawHpp).toLocaleString('id-ID');
+            document.getElementById('hpp-overhead-val').innerText = 'Rp ' + Math.round(overheadVal).toLocaleString('id-ID');
+            document.getElementById('hpp-total-final').innerText = 'Rp ' + Math.round(totalHpp).toLocaleString('id-ID');
 
             if (product) {
                 const hargaJual = product.harga;
-                const labaNominal = hargaJual - totalHppFinal;
-                const marginPersen = hargaJual > 0 ? ((labaNominal / hargaJual) * 100) : 0;
+                const laba = hargaJual - totalHpp;
+                const margin = hargaJual > 0 ? (laba / hargaJual) * 100 : 0;
 
-                document.getElementById('margin-harga-jual').innerText = `Rp ${hargaJual.toLocaleString('id-ID')}`;
-                document.getElementById('margin-laba-nominal').innerText = `Rp ${Math.round(labaNominal).toLocaleString('id-ID')}`;
-                document.getElementById('margin-persen').innerText = `${marginPersen.toFixed(2)}%`;
+                document.getElementById('margin-harga-jual').innerText = 'Rp ' + hargaJual.toLocaleString('id-ID');
+                document.getElementById('margin-laba-nominal').innerText = 'Rp ' + Math.round(laba).toLocaleString('id-ID');
+                document.getElementById('margin-persen').innerText = margin.toFixed(1) + '%';
+            } else {
+                document.getElementById('margin-harga-jual').innerText = 'Rp 0';
+                document.getElementById('margin-laba-nominal').innerText = 'Rp 0';
+                document.getElementById('margin-persen').innerText = '0%';
             }
         }
 
         function saveRecipeAndProduce() {
-            const productId = document.getElementById('recipe-product-select').value;
-            const portion = parseFloat(document.getElementById('recipe-portion').value) || 0;
-            const product = products.find(p => p.id == productId);
+            const productId = parseInt(document.getElementById('recipe-product-select').value);
+            const portion = parseInt(document.getElementById('recipe-portion').value) || 0;
 
-            if (!product || portion <= 0) {
-                alert("Pilih produk dan masukkan jumlah porsi yang sah!");
+            if (!productId || portion <= 0) {
+                alert("Pilih produk dan masukkan jumlah porsi yang diproduksi!");
                 return;
             }
 
-            let komposisi = [];
+            const komposisi = [];
             document.querySelectorAll('.recipe-row').forEach(row => {
-                const bahanId = row.querySelector('.recipe-bahan-select').value;
+                const bahanId = parseInt(row.querySelector('.recipe-bahan-select').value);
                 const qty = parseFloat(row.querySelector('.recipe-qty-input').value) || 0;
                 if (bahanId && qty > 0) {
-                    komposisi.push({ bahanId: parseInt(bahanId), qty });
+                    komposisi.push({ bahanId, qty });
                 }
             });
 
-            recipesList = recipesList.filter(r => r.productId != productId);
-            recipesList.push({ productId: product.id, komposisi });
+            if (komposisi.length === 0) {
+                alert("Masukkan minimal satu bahan baku resep!");
+                return;
+            }
 
-            // Tambah Stok Produk Siap Jual
-            product.stok += portion;
-            product.status = 'Ready';
+            const existingRecipeIndex = recipesList.findIndex(r => r.productId === productId);
+            if (existingRecipeIndex > -1) {
+                recipesList[existingRecipeIndex].komposisi = komposisi;
+            } else {
+                recipesList.push({ productId, komposisi });
+            }
 
-            alert(`Berhasil! ${portion} porsi ${product.nama} telah ditambahkan ke Stock Product Siap Jual.`);
+            const prod = products.find(p => p.id === productId);
+            if (prod) {
+                prod.stok += portion;
+                prod.status = 'Ready';
+            }
+
+            alert(`Berhasil memproduksi ${portion} porsi ${prod.nama}! Stok produk telah ditambahkan.`);
         }
 
-        // STOCK PRODUCT TABLE
+        // INVENTORY TABLES
         function renderStockProductTable() {
             const tbody = document.getElementById('stock-product-table-body');
             tbody.innerHTML = products.map(p => `
                 <tr class="hover:bg-slate-50">
                     <td class="p-4 font-semibold text-slate-800">${p.nama}</td>
                     <td class="p-4 text-slate-500">${p.kategori}</td>
-                    <td class="p-4 font-bold text-blue-600 text-base">${p.stok} Porsi</td>
+                    <td class="p-4 font-bold text-blue-600">${p.stok} Porsi</td>
                     <td class="p-4 text-slate-700">Rp ${p.harga.toLocaleString('id-ID')}</td>
-                    <td class="p-4"><span class="px-2.5 py-1 text-xs rounded-full font-semibold ${p.stok > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">${p.stok > 0 ? 'Siap Jual' : 'Habis'}</span></td>
+                    <td class="p-4"><span class="text-xs px-2.5 py-1 rounded-full font-semibold ${p.status === 'Ready' && p.stok > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">${p.status === 'Ready' && p.stok > 0 ? 'Tersedia' : 'Habis / Non-aktif'}</span></td>
                 </tr>
             `).join('');
         }
 
-        // AKUMULASI STOCK BAHAN TABLE
         function renderStockBahanTable() {
             const tbody = document.getElementById('stock-bahan-table-body');
             tbody.innerHTML = bahanBakuList.map(b => {
-                const valueTotal = b.sisaStok * b.hargaGlobal;
+                const totalValue = b.sisaStok * b.hargaGlobal;
                 return `
                     <tr class="hover:bg-slate-50">
                         <td class="p-4 font-semibold text-slate-800">${b.nama}</td>
                         <td class="p-4 text-slate-500">${b.totalStok.toLocaleString('id-ID')} ${b.satuan}</td>
-                        <td class="p-4 font-bold ${b.sisaStok > 0 ? 'text-emerald-600' : 'text-red-500'}">${b.sisaStok.toLocaleString('id-ID')} ${b.satuan}</td>
+                        <td class="p-4 font-bold ${b.sisaStok < (b.totalStok * 0.2) ? 'text-red-600' : 'text-emerald-600'}">${b.sisaStok.toLocaleString('id-ID')} ${b.satuan}</td>
                         <td class="p-4 text-slate-500">${b.satuan}</td>
-                        <td class="p-4 font-medium text-slate-700">Rp ${Math.round(valueTotal).toLocaleString('id-ID')}</td>
+                        <td class="p-4 font-semibold text-slate-700">Rp ${Math.round(totalValue).toLocaleString('id-ID')}</td>
                     </tr>
                 `;
             }).join('');
         }
 
-        // SETTINGS
+        // 1. LAPORAN PENJUALAN HARIAN
+        function renderDailyReport() {
+            const tbody = document.getElementById('daily-report-table-body');
+            const dailyData = {};
+
+            transactionsList.forEach(tx => {
+                if (!dailyData[tx.tanggal]) {
+                    dailyData[tx.tanggal] = { txCount: 0, itemsCount: 0, totalOmset: 0 };
+                }
+                dailyData[tx.tanggal].txCount += 1;
+                dailyData[tx.tanggal].itemsCount += tx.items.reduce((sum, item) => sum + item.qty, 0);
+                dailyData[tx.tanggal].totalOmset += tx.subtotal;
+            });
+
+            const dates = Object.keys(dailyData);
+            if (dates.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400">Belum ada transaksi recorded</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = dates.map(date => `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-4 font-semibold text-slate-800">${date}</td>
+                    <td class="p-4 text-slate-600">${dailyData[date].txCount} Transaksi</td>
+                    <td class="p-4 text-slate-600">${dailyData[date].itemsCount} Porsi</td>
+                    <td class="p-4 font-bold text-emerald-600">Rp ${dailyData[date].totalOmset.toLocaleString('id-ID')}</td>
+                </tr>
+            `).join('');
+        }
+
+        // 2. LAPORAN TRANSAKSI DETAIL METODE
+        function renderTxReport() {
+            const tbody = document.getElementById('tx-report-table-body');
+
+            let totalCash = 0, totalTransfer = 0, totalEwallet = 0;
+
+            transactionsList.forEach(tx => {
+                if (tx.metode === 'cash') totalCash += tx.total;
+                if (tx.metode === 'transfer') totalTransfer += tx.total;
+                if (tx.metode === 'ewallet') totalEwallet += tx.total;
+            });
+
+            document.getElementById('tx-total-cash').innerText = 'Rp ' + totalCash.toLocaleString('id-ID');
+            document.getElementById('tx-total-transfer').innerText = 'Rp ' + totalTransfer.toLocaleString('id-ID');
+            document.getElementById('tx-total-ewallet').innerText = 'Rp ' + totalEwallet.toLocaleString('id-ID');
+
+            if (transactionsList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Belum ada transaksi recorded</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = transactionsList.map(tx => {
+                const itemList = tx.items.map(i => `${i.nama} (${i.qty})`).join(', ');
+                const methodBadge = tx.metode === 'cash' ? 'bg-emerald-100 text-emerald-700' : (tx.metode === 'transfer' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700');
+
+                return `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-4"><p class="font-bold text-slate-800 text-xs">${tx.id}</p><p class="text-[10px] text-slate-400">${tx.tanggal} ${tx.waktu}</p></td>
+                        <td class="p-4 text-xs text-slate-600">${itemList}</td>
+                        <td class="p-4"><span class="text-xs px-2 py-0.5 rounded font-semibold uppercase ${methodBadge}">${tx.metode}</span></td>
+                        <td class="p-4 text-slate-600 text-xs">Rp ${tx.subtotal.toLocaleString('id-ID')}</td>
+                        <td class="p-4 text-slate-600 text-xs">Rp ${tx.ppn.toLocaleString('id-ID')}</td>
+                        <td class="p-4 font-bold text-slate-800 text-xs">Rp ${tx.total.toLocaleString('id-ID')}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // 3. LAPORAN CASHFLOW & PENGELUARAN
+        function saveExpense() {
+            const kategori = document.getElementById('expense-category').value;
+            const keterangan = document.getElementById('expense-desc').value;
+            const nominal = parseFloat(document.getElementById('expense-amount').value) || 0;
+
+            if (!keterangan || nominal <= 0) {
+                alert("Lengkapi keterangan dan nominal pengeluaran!");
+                return;
+            }
+
+            const today = new Date().toISOString().split('T')[0];
+            expensesList.push({ tanggal: today, kategori, keterangan, nominal });
+
+            alert("Pengeluaran Berhasil Dicatat!");
+            document.getElementById('expense-desc').value = "";
+            document.getElementById('expense-amount').value = "";
+            renderExpenseTable();
+        }
+
+        function renderExpenseTable() {
+            const tbody = document.getElementById('expense-table-body');
+            if (expensesList.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400">Belum ada pengeluaran dicatat</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = expensesList.map(exp => `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-3 text-slate-500 text-xs">${exp.tanggal}</td>
+                    <td class="p-3 font-semibold text-slate-700 text-xs">${exp.kategori}</td>
+                    <td class="p-3 text-slate-600 text-xs">${exp.keterangan}</td>
+                    <td class="p-3 font-bold text-red-600 text-xs text-right">Rp ${exp.nominal.toLocaleString('id-ID')}</td>
+                </tr>
+            `).join('');
+        }
+
+        // 4. LAPORAN PnL (LABA RUGI COMPREHENSIVE)
+        function renderPnLReport() {
+            // A. Stock Value Calculation
+            let rawMaterialValue = 0;
+            bahanBakuList.forEach(b => {
+                rawMaterialValue += (b.sisaStok * b.hargaGlobal);
+            });
+
+            let unsoldProductValue = 0;
+            products.forEach(p => {
+                const recipe = recipesList.find(r => r.productId === p.id);
+                let productHpp = 0;
+                if (recipe) {
+                    recipe.komposisi.forEach(comp => {
+                        const bahan = bahanBakuList.find(b => b.id === comp.bahanId);
+                        if (bahan) productHpp += (bahan.hargaGlobal * comp.qty);
+                    });
+                }
+                unsoldProductValue += (p.stok * productHpp);
+            });
+
+            const totalAssetStock = rawMaterialValue + unsoldProductValue;
+
+            // B. Omset & Sales Profit
+            let totalOmset = 0;
+            let totalCogs = 0;
+            let totalOverhead = 0;
+
+            transactionsList.forEach(tx => {
+                totalOmset += tx.subtotal;
+                totalCogs += tx.cogs;
+                totalOverhead += tx.overhead;
+            });
+
+            const grossProfit = totalOmset - totalCogs - totalOverhead;
+
+            // C. Expenses Breakdown
+            let expBahan = 0, expOps = 0, expAsset = 0;
+            expensesList.forEach(e => {
+                if (e.kategori === 'Bahan Baku') expBahan += e.nominal;
+                if (e.kategori === 'Operasional') expOps += e.nominal;
+                if (e.kategori === 'Asset') expAsset += e.nominal;
+            });
+
+            const netProfit = grossProfit - expOps - expAsset;
+
+            // DOM Updates
+            document.getElementById('pnl-raw-value').innerText = 'Rp ' + Math.round(rawMaterialValue).toLocaleString('id-ID');
+            document.getElementById('pnl-unsold-product-value').innerText = 'Rp ' + Math.round(unsoldProductValue).toLocaleString('id-ID');
+            document.getElementById('pnl-total-asset-value').innerText = 'Rp ' + Math.round(totalAssetStock).toLocaleString('id-ID');
+
+            document.getElementById('pnl-omset').innerText = 'Rp ' + Math.round(totalOmset).toLocaleString('id-ID');
+            document.getElementById('pnl-cogs').innerText = '- Rp ' + Math.round(totalCogs).toLocaleString('id-ID');
+            document.getElementById('pnl-overhead').innerText = '- Rp ' + Math.round(totalOverhead).toLocaleString('id-ID');
+            document.getElementById('pnl-gross-profit').innerText = 'Rp ' + Math.round(grossProfit).toLocaleString('id-ID');
+
+            document.getElementById('pnl-exp-bahan').innerText = 'Rp ' + Math.round(expBahan).toLocaleString('id-ID');
+            document.getElementById('pnl-exp-ops').innerText = 'Rp ' + Math.round(expOps).toLocaleString('id-ID');
+            document.getElementById('pnl-exp-asset').innerText = 'Rp ' + Math.round(expAsset).toLocaleString('id-ID');
+
+            document.getElementById('pnl-net-profit').innerText = 'Rp ' + Math.round(netProfit).toLocaleString('id-ID');
+        }
+
+        // PENGATURAN
         function saveSettings() {
             overheadRate = parseFloat(document.getElementById('set-overhead-rate').value) || 0;
             ppnRate = parseFloat(document.getElementById('set-ppn-rate').value) || 0;
-            alert("Pengaturan persentase Overhead & PPN berhasil diperbarui!");
+            alert("Pengaturan Overhead & PPN berhasil disimpan!");
         }
 
-        // Init App
-        renderPosProducts();
-        lucide.createIcons();
+        // INITIALIZATION
+        document.addEventListener("DOMContentLoaded", function() {
+            lucide.createIcons();
+            renderPosProducts();
+        });
     </script>
 </body>
 </html>
-"""
-
-components.html(html_code, height=900, scrolling=True)
