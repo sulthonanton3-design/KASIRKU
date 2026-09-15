@@ -1,3 +1,27 @@
+import streamlit as st
+import streamlit.components.v1 as components
+
+# Konfigurasi Halaman Streamlit
+st.set_page_config(
+    page_title="KASIRKU - Dashboard & POS System",
+    page_icon="🛒",
+    layout="wide"
+)
+
+# Menghilangkan margin bawaan Streamlit agar tampilan HTML full screen
+st.markdown("""
+    <style>
+        .block-container {
+            padding: 0rem !important;
+            max-width: 100% !important;
+        }
+        header {visibility: hidden;}
+        footer {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
+
+# Kode HTML Utuh Dashboard KASIRKU
+html_code = """
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -132,7 +156,6 @@
                     <span class="text-sm bg-blue-50 text-blue-600 px-3 py-1 rounded-full border border-blue-200">Mode Transaksi On</span>
                 </div>
                 <div class="grid grid-cols-3 gap-6">
-                    <!-- Area Pilih Produk -->
                     <div class="col-span-2 space-y-4">
                         <div class="flex gap-2">
                             <input type="text" placeholder="Cari nama atau barcode produk..." class="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
@@ -143,7 +166,6 @@
                             </select>
                         </div>
                         <div class="grid grid-cols-3 gap-4">
-                            <!-- Contoh Card Produk -->
                             <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
                                 <div>
                                     <span class="text-[10px] font-semibold bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded">Ready</span>
@@ -168,7 +190,6 @@
                             </div>
                         </div>
                     </div>
-                    <!-- Area Cart / Keranjang -->
                     <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between h-[500px]">
                         <div>
                             <h3 class="font-bold border-b pb-2 text-slate-700">Detail Pesanan</h3>
@@ -368,7 +389,6 @@
                     </div>
                     <button class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">+ Catat Pengeluaran</button>
                 </div>
-                <!-- Filter -->
                 <div class="bg-white p-4 rounded-xl border mb-6 flex gap-4">
                     <input type="date" class="border rounded-lg p-2 text-sm">
                     <select class="border rounded-lg p-2 text-sm">
@@ -567,36 +587,33 @@
 
     <!-- LOGIKA SCRIPT JAVASCRIPT -->
     <script>
-        // Inisialisasi Icon Lucide
         lucide.createIcons();
 
-        // Fungsi Switch Navigasi Tab
         function switchTab(tabId) {
-            // Sembunyikan semua tab konten
             const contents = document.querySelectorAll('.tab-content');
             contents.forEach(content => content.classList.add('hidden'));
 
-            // Hapus status aktif dari semua tombol navigasi
             const buttons = document.querySelectorAll('.nav-btn');
             buttons.forEach(btn => btn.classList.remove('active-menu'));
 
-            // Tampilkan tab yang dipilih
             const selectedTab = document.getElementById('tab-' + tabId);
             if (selectedTab) {
                 selectedTab.classList.remove('hidden');
             }
 
-            // Tandai tombol yang aktif (jika bukan tombol utama Kasir)
             const selectedBtn = document.getElementById('btn-' + tabId);
             if (selectedBtn && tabId !== 'kasir') {
                 selectedBtn.classList.add('active-menu');
             }
         }
 
-        // Jalankan default tab saat pertama dimuat (default: Kasir POS)
         document.addEventListener('DOMContentLoaded', () => {
             switchTab('kasir');
         });
     </script>
 </body>
 </html>
+"""
+
+# Render kode HTML ke dalam Streamlit
+components.html(html_code, height=900, scrolling=True)
