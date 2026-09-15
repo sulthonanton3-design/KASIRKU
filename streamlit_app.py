@@ -120,7 +120,9 @@ if menu == "🛒 Kasir (POS)":
                             st.write("🖼️ *Tanpa Gambar*")
                         st.markdown(f"**{row['name']}**")
                         st.markdown(f"<h5 style='color: #1E88E5; margin:0;'>Rp {row['price']:,.0f}</h5>", unsafe_allow_html=True)
-                        st.caption(f"Stok: {row['stock']}")
+                        # Kode baru yang aman:
+stock_val = row.get('stock', 0)
+st.caption(f"Stok: {stock_val}")
                         
                         if st.button(f"➕ Tambah", key=f"btn_add_{row['id']}", use_container_width=True):
                             st.session_state['cart'].append({"id": row['id'], "name": row['name'], "price": row['price']})
