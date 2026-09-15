@@ -79,23 +79,6 @@ html_code = """
                         <button onclick="switchTab('inv-bahan')" id="btn-inv-bahan" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
                             <i data-lucide="layers" class="w-4 h-4"></i> Akumulasi Stock Bahan
                         </button>
-                        <button onclick="switchTab('inv-opname')" id="btn-inv-opname" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
-                            <i data-lucide="clipboard-check" class="w-4 h-4"></i> Stock Opname
-                        </button>
-
-                        <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 pt-3">Laporan</div>
-                        <button onclick="switchTab('lap-cashflow')" id="btn-lap-cashflow" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
-                            <i data-lucide="arrow-left-right" class="w-4 h-4"></i> Cashflow
-                        </button>
-                        <button onclick="switchTab('lap-penjualan-harian')" id="btn-lap-penjualan-harian" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
-                            <i data-lucide="receipt" class="w-4 h-4"></i> Penjualan Harian
-                        </button>
-                        <button onclick="switchTab('lap-sales')" id="btn-lap-sales" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
-                            <i data-lucide="trending-up" class="w-4 h-4"></i> Sales Transaction
-                        </button>
-                        <button onclick="switchTab('lap-pnl')" id="btn-lap-pnl" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
-                            <i data-lucide="pie-chart" class="w-4 h-4"></i> Laporan PnL
-                        </button>
 
                         <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 pt-3">Pengaturan</div>
                         <button onclick="switchTab('set-overhead')" id="btn-set-overhead" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
@@ -131,11 +114,11 @@ html_code = """
                             <input type="text" id="pos-search" onkeyup="filterPosProducts()" placeholder="Cari nama atau barcode produk..." class="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div class="grid grid-cols-3 gap-4" id="pos-products-grid">
-                            <!-- Produk di-render dinamis via JS -->
+                            <!-- Produk di-render dinamis -->
                         </div>
                     </div>
 
-                    <!-- Detail Pesanan & Pembayaran -->
+                    <!-- Detail Pesanan -->
                     <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between h-[620px]">
                         <div>
                             <h3 class="font-bold border-b pb-2 text-slate-700 flex justify-between">
@@ -163,7 +146,6 @@ html_code = """
                                 </div>
                             </div>
 
-                            <!-- Opsi Pembayaran -->
                             <div class="space-y-2 border-t pt-2">
                                 <label class="block text-xs font-medium text-slate-600">Metode Pembayaran</label>
                                 <div class="grid grid-cols-3 gap-1">
@@ -173,7 +155,6 @@ html_code = """
                                 </div>
                             </div>
 
-                            <!-- Input Pembayaran Cash -->
                             <div id="cash-payment-section" class="space-y-1">
                                 <label class="block text-xs font-medium text-slate-600">Uang Terbayar (Cash)</label>
                                 <input type="number" id="cash-paid" oninput="calculateChange()" placeholder="Rp 0" class="w-full border rounded-lg p-2 text-sm focus:ring-1 focus:ring-blue-500">
@@ -269,20 +250,21 @@ html_code = """
                 </div>
             </section>
 
-            <!-- TAB 4: MASTER DATA - PEMBUATAN PRODUCT (RACIKAN / RESEP) -->
+            <!-- TAB 4: PEMBUATAN PRODUCT (RESEP & HPP + MARGIN) -->
             <section id="tab-master-racikan" class="tab-content hidden">
-                <h2 class="text-2xl font-bold text-slate-800 mb-2">Pembuatan Product (Resep & HPP)</h2>
-                <p class="text-sm text-slate-500 mb-6">Racik bahan baku ke dalam produk untuk otomatisasi hitung HPP dan Overhead.</p>
-                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6">
+                <h2 class="text-2xl font-bold text-slate-800 mb-2">Pembuatan Product (Resep, HPP & Margin)</h2>
+                <p class="text-sm text-slate-500 mb-6">Racik bahan baku ke dalam produk untuk otomatisasi hitung HPP, Overhead, dan Analisis Profit Margin.</p>
+                
+                <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-6 mb-8">
                     <div class="grid grid-cols-2 gap-6">
                         <div>
                             <label class="block text-sm font-medium mb-1">Pilih Produk Jadi</label>
-                            <select id="recipe-product-select" class="w-full border rounded-lg p-2.5 text-sm">
+                            <select id="recipe-product-select" onchange="calculateHPP()" class="w-full border rounded-lg p-2.5 text-sm">
                                 <option value="">-- Pilih Produk --</option>
                             </select>
                         </div>
                         <div>
-                            <label class="block text-sm font-medium mb-1">Estimasi Porsi Terbuat (Per Racikan)</label>
+                            <label class="block text-sm font-medium mb-1">Estimasi Porsi Terbuat (Per Racikan Batch)</label>
                             <input type="number" id="recipe-portion" value="1" min="1" oninput="calculateHPP()" class="w-full border rounded-lg p-2.5 text-sm">
                         </div>
                     </div>
@@ -297,23 +279,64 @@ html_code = """
                         </div>
                     </div>
 
-                    <!-- Output Kalkulasi HPP -->
-                    <div class="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-2 text-sm">
-                        <div class="flex justify-between text-slate-600">
-                            <span>Total HPP Bahan Baku Mentah:</span>
-                            <span id="hpp-bahan-raw" class="font-semibold">Rp 0</span>
+                    <!-- Output Kalkulasi HPP & Margin -->
+                    <div class="grid grid-cols-2 gap-4 border-t pt-4">
+                        <div class="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-2 text-sm">
+                            <h5 class="font-bold text-blue-900 border-b border-blue-200 pb-1">Kalkulasi Biaya & HPP</h5>
+                            <div class="flex justify-between text-slate-600">
+                                <span>HPP Bahan Mentah / Porsi:</span>
+                                <span id="hpp-bahan-raw" class="font-semibold">Rp 0</span>
+                            </div>
+                            <div class="flex justify-between text-slate-600">
+                                <span>Overhead (<span id="overhead-rate-display">10</span>%):</span>
+                                <span id="hpp-overhead-val" class="font-semibold">Rp 0</span>
+                            </div>
+                            <div class="flex justify-between font-bold text-base border-t border-blue-200 pt-2 text-slate-800">
+                                <span>Total HPP / Porsi:</span>
+                                <span id="hpp-total-final" class="text-blue-600">Rp 0</span>
+                            </div>
                         </div>
-                        <div class="flex justify-between text-slate-600">
-                            <span>Overhead Terakumulasi (<span id="overhead-rate-display">10</span>%):</span>
-                            <span id="hpp-overhead-val" class="font-semibold">Rp 0</span>
-                        </div>
-                        <div class="flex justify-between font-bold text-base border-t border-blue-200 pt-2 text-slate-800">
-                            <span>Total HPP per Porsi:</span>
-                            <span id="hpp-total-final" class="text-blue-600">Rp 0</span>
+
+                        <div class="bg-emerald-50/50 p-4 rounded-xl border border-emerald-100 space-y-2 text-sm">
+                            <h5 class="font-bold text-emerald-900 border-b border-emerald-200 pb-1">Analisis Profit & Margin</h5>
+                            <div class="flex justify-between text-slate-600">
+                                <span>Harga Jual Produk:</span>
+                                <span id="margin-harga-jual" class="font-semibold text-slate-800">Rp 0</span>
+                            </div>
+                            <div class="flex justify-between text-slate-600">
+                                <span>Laba Kotor Nominal:</span>
+                                <span id="margin-laba-nominal" class="font-semibold text-emerald-700">Rp 0</span>
+                            </div>
+                            <div class="flex justify-between font-bold text-base border-t border-emerald-200 pt-2 text-slate-800">
+                                <span>Profit Margin (%):</span>
+                                <span id="margin-persen" class="text-emerald-600">0%</span>
+                            </div>
                         </div>
                     </div>
 
                     <button onclick="saveRecipe()" class="bg-emerald-600 text-white font-semibold px-6 py-2.5 rounded-lg text-sm hover:bg-emerald-700 transition">Simpan Resep & HPP Produk</button>
+                </div>
+
+                <!-- TABEL DAFTAR RESEP TERSIMPAN -->
+                <div class="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+                    <h3 class="text-lg font-bold text-slate-800 mb-4">Daftar Resep Produk Tersimpan</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead class="bg-slate-50 border-b text-xs font-semibold text-slate-500 uppercase">
+                                <tr>
+                                    <th class="p-3">Nama Produk</th>
+                                    <th class="p-3">Harga Jual</th>
+                                    <th class="p-3">Total HPP / Porsi</th>
+                                    <th class="p-3">Laba Kotor</th>
+                                    <th class="p-3">Profit Margin</th>
+                                    <th class="p-3">Komposisi Bahan</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recipe-table-body" class="divide-y text-sm">
+                                <!-- Diisi via JS -->
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
 
@@ -378,7 +401,6 @@ html_code = """
     <script>
         lucide.createIcons();
 
-        // APP STATE (DATA DUMMY & UTAMA)
         let overheadRate = 10;
         let ppnRate = 11;
         let selectedPayMethod = 'cash';
@@ -391,10 +413,25 @@ html_code = """
 
         let bahanBakuList = [
             { id: 1, nama: 'Biji Kopi Arabika', satuan: 'Gram', volume: 1000, qty: 2, hargaPack: 150000, hargaGlobal: 150 },
-            { id: 2, nama: 'Susu UHT', satuan: 'ML', volume: 1000, qty: 10, hargaPack: 18000, hargaGlobal: 18 }
+            { id: 2, nama: 'Susu UHT', satuan: 'ML', volume: 1000, qty: 10, hargaPack: 18000, hargaGlobal: 18 },
+            { id: 3, nama: 'Gula Aren', satuan: 'ML', volume: 1000, qty: 5, hargaPack: 21000, hargaGlobal: 21 },
+            { id: 4, nama: 'Botol 250ml', satuan: 'Pcs', volume: 1, qty: 100, hargaPack: 1800, hargaGlobal: 1800 }
         ];
 
-        // SWITCH TAB NAVIGASI
+        // DAFTAR RESEP TERSIMPAN
+        let recipesList = [
+            {
+                productId: 1,
+                productName: 'Kopi Susu Gula Aren',
+                hargaJual: 18000,
+                porsiBatch: 1,
+                hppPerPorsi: 7885,
+                labaNominal: 10115,
+                marginPersen: 56.19,
+                komposisiText: 'Kopi (12g), Susu UHT (100ml), Gula Aren (6ml), Botol (1 Pcs)'
+            }
+        ];
+
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
             document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active-menu'));
@@ -410,11 +447,10 @@ html_code = """
             if (tabId === 'master-racikan') initRacikanTab();
         }
 
-        // --- MANAJEMEN KASIR & KERANJANG ---
+        // --- POS FUNCTIONS ---
         function renderPosProducts(filter = "") {
             const grid = document.getElementById('pos-products-grid');
             grid.innerHTML = "";
-
             products.filter(p => p.nama.toLowerCase().includes(filter.toLowerCase())).forEach(p => {
                 const isReady = p.status === 'Ready';
                 const card = document.createElement('div');
@@ -436,20 +472,14 @@ html_code = """
         }
 
         function filterPosProducts() {
-            const val = document.getElementById('pos-search').value;
-            renderPosProducts(val);
+            renderPosProducts(document.getElementById('pos-search').value);
         }
 
         function addToCart(productId) {
             const p = products.find(prod => prod.id === productId);
             if (!p) return;
-
             const existing = cart.find(item => item.id === productId);
-            if (existing) {
-                existing.qty++;
-            } else {
-                cart.push({ ...p, qty: 1 });
-            }
+            if (existing) { existing.qty++; } else { cart.push({ ...p, qty: 1 }); }
             renderCart();
         }
 
@@ -457,17 +487,12 @@ html_code = """
             const item = cart.find(i => i.id === id);
             if (item) {
                 item.qty += delta;
-                if (item.qty <= 0) {
-                    cart = cart.filter(i => i.id !== id);
-                }
+                if (item.qty <= 0) cart = cart.filter(i => i.id !== id);
             }
             renderCart();
         }
 
-        function clearCart() {
-            cart = [];
-            renderCart();
-        }
+        function clearCart() { cart = []; renderCart(); }
 
         function renderCart() {
             const container = document.getElementById('cart-items');
@@ -482,8 +507,7 @@ html_code = """
 
             let subtotal = 0;
             container.innerHTML = cart.map(item => {
-                const itemTotal = item.harga * item.qty;
-                subtotal += itemTotal;
+                subtotal += (item.harga * item.qty);
                 return `
                     <div class="flex justify-between items-center py-2">
                         <div>
@@ -521,18 +545,12 @@ html_code = """
             selectedBtn.classList.add('bg-blue-600', 'text-white');
 
             const cashSec = document.getElementById('cash-payment-section');
-            if (method === 'cash') {
-                cashSec.classList.remove('hidden');
-            } else {
-                cashSec.classList.add('hidden');
-            }
+            if (method === 'cash') cashSec.classList.remove('hidden');
+            else cashSec.classList.add('hidden');
         }
 
         function calculateChange() {
-            if (cart.length === 0) {
-                document.getElementById('cash-change').innerText = 'Rp 0';
-                return;
-            }
+            if (cart.length === 0) { document.getElementById('cash-change').innerText = 'Rp 0'; return; }
             let subtotal = cart.reduce((acc, curr) => acc + (curr.harga * curr.qty), 0);
             let total = subtotal + (subtotal * (ppnRate / 100));
 
@@ -548,14 +566,12 @@ html_code = """
             document.getElementById('cash-paid').value = '';
         }
 
-        // --- MANAJEMEN MASTER PRODUK & GAMBAR ---
+        // --- MASTER PRODUK ---
         function renderProductTable() {
             const body = document.getElementById('product-table-body');
             body.innerHTML = products.map(p => `
                 <tr>
-                    <td class="p-4">
-                        <img src="${p.gambar || 'https://via.placeholder.com/80'}" class="w-12 h-12 object-cover rounded-lg border">
-                    </td>
+                    <td class="p-4"><img src="${p.gambar || 'https://via.placeholder.com/80'}" class="w-12 h-12 object-cover rounded-lg border"></td>
                     <td class="p-4 font-semibold">${p.nama}</td>
                     <td class="p-4 text-slate-500">${p.kategori}</td>
                     <td class="p-4 font-semibold">Rp ${p.harga.toLocaleString('id-ID')}</td>
@@ -621,7 +637,7 @@ html_code = """
             }
         }
 
-        // --- MANAJEMEN BAHAN BAKU ---
+        // --- BAHAN BAKU ---
         function calcBahanGlobal() {
             const vol = parseFloat(document.getElementById('bahan-volume').value) || 0;
             const qty = parseFloat(document.getElementById('bahan-qty').value) || 0;
@@ -658,14 +674,15 @@ html_code = """
             calcBahanGlobal();
         }
 
-        // --- MANAJEMEN PEMBUATAN PRODUK & HPP ---
+        // --- PEMBUATAN PRODUK (RESEP, HPP & MARGIN) ---
         function initRacikanTab() {
             const select = document.getElementById('recipe-product-select');
-            select.innerHTML = '<option value="">-- Pilih Produk --</option>' + products.map(p => `<option value="${p.id}">${p.nama}</option>`).join('');
+            select.innerHTML = '<option value="">-- Pilih Produk --</option>' + products.map(p => `<option value="${p.id}">${p.nama} (Rp ${p.harga.toLocaleString('id-ID')})</option>`).join('');
 
             const container = document.getElementById('recipe-rows-container');
             container.innerHTML = "";
             addRecipeRow();
+            renderRecipesTable();
         }
 
         function addRecipeRow() {
@@ -701,7 +718,6 @@ html_code = """
             rows.forEach(row => {
                 const bahanId = row.querySelector('.recipe-bahan-select').value;
                 const qty = parseFloat(row.querySelector('.recipe-qty-input').value) || 0;
-
                 const bahan = bahanBakuList.find(b => b.id == bahanId);
                 if (bahan) {
                     totalRawCost += bahan.hargaGlobal * qty;
@@ -717,10 +733,86 @@ html_code = """
             document.getElementById('hpp-overhead-val').innerText = `Rp ${Math.round(overheadVal).toLocaleString('id-ID')}`;
             document.getElementById('hpp-total-final').innerText = `Rp ${Math.round(totalHPP).toLocaleString('id-ID')}`;
             document.getElementById('overhead-rate-display').innerText = overheadRate;
+
+            // KALKULASI MARGIN
+            const prodId = document.getElementById('recipe-product-select').value;
+            const currentProd = products.find(p => p.id == prodId);
+            const hargaJual = currentProd ? currentProd.harga : 0;
+            const labaNominal = hargaJual - totalHPP;
+            const marginPersen = hargaJual > 0 ? (labaNominal / hargaJual) * 100 : 0;
+
+            document.getElementById('margin-harga-jual').innerText = `Rp ${hargaJual.toLocaleString('id-ID')}`;
+            document.getElementById('margin-laba-nominal').innerText = `Rp ${Math.round(labaNominal).toLocaleString('id-ID')}`;
+            document.getElementById('margin-persen').innerText = `${marginPersen.toFixed(2)}%`;
         }
 
         function saveRecipe() {
-            alert('Resep dan Perhitungan HPP Produk Berhasil Disimpan!');
+            const prodId = document.getElementById('recipe-product-select').value;
+            const currentProd = products.find(p => p.id == prodId);
+            if (!currentProd) return alert('Pilih Produk Jadi terlebih dahulu!');
+
+            let totalRawCost = 0;
+            let komposisiArr = [];
+            const rows = document.querySelectorAll('.recipe-row');
+
+            rows.forEach(row => {
+                const bahanId = row.querySelector('.recipe-bahan-select').value;
+                const qty = parseFloat(row.querySelector('.recipe-qty-input').value) || 0;
+                const bahan = bahanBakuList.find(b => b.id == bahanId);
+                if (bahan && qty > 0) {
+                    totalRawCost += bahan.hargaGlobal * qty;
+                    komposisiArr.push(`${bahan.nama} (${qty} ${bahan.satuan})`);
+                }
+            });
+
+            const porsi = parseFloat(document.getElementById('recipe-portion').value) || 1;
+            const rawCostPerPortion = totalRawCost / porsi;
+            const overheadVal = rawCostPerPortion * (overheadRate / 100);
+            const totalHPP = Math.round(rawCostPerPortion + overheadVal);
+
+            const labaNominal = currentProd.harga - totalHPP;
+            const marginPersen = currentProd.harga > 0 ? ((labaNominal / currentProd.harga) * 100).toFixed(2) : 0;
+
+            // Update atau Tambah Ke Resep List
+            const existingIdx = recipesList.findIndex(r => r.productId == prodId);
+            const newRecipe = {
+                productId: currentProd.id,
+                productName: currentProd.nama,
+                hargaJual: currentProd.harga,
+                porsiBatch: porsi,
+                hppPerPorsi: totalHPP,
+                labaNominal: labaNominal,
+                marginPersen: marginPersen,
+                komposisiText: komposisiArr.join(', ')
+            };
+
+            if (existingIdx !== -1) {
+                recipesList[existingIdx] = newRecipe;
+            } else {
+                recipesList.push(newRecipe);
+            }
+
+            alert('Resep dan Perhitungan HPP & Margin Produk Berhasil Disimpan!');
+            renderRecipesTable();
+        }
+
+        function renderRecipesTable() {
+            const body = document.getElementById('recipe-table-body');
+            if (recipesList.length === 0) {
+                body.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Belum ada resep produk yang disimpan.</td></tr>`;
+                return;
+            }
+
+            body.innerHTML = recipesList.map(r => `
+                <tr>
+                    <td class="p-3 font-semibold text-slate-800">${r.productName}</td>
+                    <td class="p-3">Rp ${r.hargaJual.toLocaleString('id-ID')}</td>
+                    <td class="p-3 font-semibold text-blue-600">Rp ${r.hppPerPorsi.toLocaleString('id-ID')}</td>
+                    <td class="p-3 text-emerald-600 font-semibold">Rp ${r.labaNominal.toLocaleString('id-ID')}</td>
+                    <td class="p-3"><span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-xs font-bold">${r.marginPersen}%</span></td>
+                    <td class="p-3 text-xs text-slate-500 max-w-xs truncate" title="${r.komposisiText}">${r.komposisiText}</td>
+                </tr>
+            `).join('');
         }
 
         function saveSettings() {
@@ -737,4 +829,4 @@ html_code = """
 </html>
 """
 
-components.html(html_code, height=920, scrolling=True)
+components.html(html_code, height=960, scrolling=True)
