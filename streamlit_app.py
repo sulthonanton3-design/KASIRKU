@@ -227,7 +227,6 @@ elif menu == "📝 Kelola & Edit Produk":
     with f_col3:
         status_filter = st.selectbox("Status", ["Semua Status", "Aktif", "Draft"], label_visibility="collapsed")
 
-    # Form Modifikasi / Edit Produk Modal Dialog
     if 'edit_product_id' in st.session_state:
         st.markdown("---")
         st.subheader("✏️ Edit Data Produk")
@@ -243,7 +242,7 @@ elif menu == "📝 Kelola & Edit Produk":
                     e_sku = st.text_input("SKU / Barcode", value=p_data[1] if p_data[1] else "")
                     e_price = st.number_input("Harga Jual (Rp)", value=float(p_data[4]))
                 with col_e2:
-                    e_stock = st.number_input("Stok", value=float(p_data[6]) if p_data[6] is not null else 0.0)
+                    e_stock = st.number_input("Stok", value=float(p_data[6]) if p_data[6] is not None else 0.0)
                     e_status = st.selectbox("Status", ["Aktif", "Draft"], index=1 if p_data[8] == 1 else 0)
                 
                 col_btn1, col_btn2 = st.columns(2)
@@ -498,10 +497,11 @@ elif menu == "🍔 Buat Produk & Kalkulasi HPP":
                     img_path = save_uploaded_file(p_img)
                     final_sku = p_sku if p_sku else f"DPT-{int(datetime.now().timestamp())}"
                     
+                    # Diberikan 8 buah '?' yang persis sama dengan 8 kolom
                     c.execute("""
                         INSERT INTO products (sku, name, category, price, hpp, stock, image, is_draft) 
-                        VALUES (?, ?, ?, ?, ?, ?, ?, 0)
-                    """, (final_sku, p_name, p_category, p_price, total_hpp_satuan, p_stock, img_path))
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (final_sku, p_name, p_category, p_price, total_hpp_satuan, p_stock, img_path, 0))
                                   
                     p_id = c.lastrowid
                     for m_id, q_per_porsi in selected_recipe_per_portion:
@@ -518,10 +518,11 @@ elif menu == "🍔 Buat Produk & Kalkulasi HPP":
                 img_path = save_uploaded_file(p_img)
                 final_sku = p_sku if p_sku else f"DPT-{int(datetime.now().timestamp())}"
                 
+                # Diberikan 8 buah '?' yang persis sama dengan 8 kolom
                 c.execute("""
                     INSERT INTO products (sku, name, category, price, hpp, stock, image, is_draft) 
-                    VALUES (?, ?, ?, ?, ?, ?, ?, 1)
-                """, (final_sku, draft_name, p_category, p_price, total_hpp_satuan, p_stock, img_path))
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (final_sku, draft_name, p_category, p_price, total_hpp_satuan, p_stock, img_path, 1))
                               
                 p_id = c.lastrowid
                 for m_id, q_per_porsi in selected_recipe_per_portion:
