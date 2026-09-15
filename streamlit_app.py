@@ -72,14 +72,6 @@ html_code = """
                             <i data-lucide="chef-hat" class="w-4 h-4"></i> Pembuatan Product
                         </button>
 
-                        <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 pt-3">Inventory</div>
-                        <button onclick="switchTab('inv-product')" id="btn-inv-product" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
-                            <i data-lucide="archive" class="w-4 h-4"></i> Stock Product
-                        </button>
-                        <button onclick="switchTab('inv-bahan')" id="btn-inv-bahan" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
-                            <i data-lucide="layers" class="w-4 h-4"></i> Akumulasi Stock Bahan
-                        </button>
-
                         <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 pt-3">Pengaturan</div>
                         <button onclick="switchTab('set-overhead')" id="btn-set-overhead" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
                             <i data-lucide="percent" class="w-4 h-4"></i> Overhead & PPN
@@ -103,7 +95,7 @@ html_code = """
         <main class="flex-1 overflow-y-auto bg-slate-50 p-6" id="main-content">
 
             <!-- TAB 1: KASIR / POS -->
-            <section id="tab-kasir" class="tab-content hidden">
+            <section id="tab-kasir" class="tab-content">
                 <div class="flex justify-between items-center mb-6">
                     <h2 class="text-2xl font-bold text-slate-800">Menu Pengkasiran</h2>
                     <span class="text-sm bg-blue-50 text-blue-600 px-3 py-1 rounded-full border border-blue-200">Mode Transaksi On</span>
@@ -111,7 +103,7 @@ html_code = """
                 <div class="grid grid-cols-3 gap-6">
                     <div class="col-span-2 space-y-4">
                         <div class="flex gap-2">
-                            <input type="text" id="pos-search" onkeyup="filterPosProducts()" placeholder="Cari nama atau barcode produk..." class="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            <input type="text" id="pos-search" onkeyup="filterPosProducts()" placeholder="Cari nama produk..." class="w-full px-4 py-2 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                         </div>
                         <div class="grid grid-cols-3 gap-4" id="pos-products-grid">
                             <!-- Produk di-render dinamis -->
@@ -399,8 +391,6 @@ html_code = """
     </div>
 
     <script>
-        lucide.createIcons();
-
         let overheadRate = 10;
         let ppnRate = 11;
         let selectedPayMethod = 'cash';
@@ -418,7 +408,6 @@ html_code = """
             { id: 4, nama: 'Botol 250ml', satuan: 'Pcs', volume: 1, qty: 100, hargaPack: 1800, hargaGlobal: 1800 }
         ];
 
-        // DAFTAR RESEP TERSIMPAN
         let recipesList = [
             {
                 productId: 1,
@@ -472,141 +461,155 @@ html_code = """
         }
 
         function filterPosProducts() {
-            renderPosProducts(document.getElementById('pos-search').value);
+            const query = document.getElementById('pos-search').value;
+            renderPosProducts(query);
         }
 
         function addToCart(productId) {
-            const p = products.find(prod => prod.id === productId);
-            if (!p) return;
-            const existing = cart.find(item => item.id === productId);
-            if (existing) { existing.qty++; } else { cart.push({ ...p, qty: 1 }); }
-            renderCart();
-        }
-
-        function updateCartQty(id, delta) {
-            const item = cart.find(i => i.id === id);
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+            const item = cart.find(c => c.id === productId);
             if (item) {
-                item.qty += delta;
-                if (item.qty <= 0) cart = cart.filter(i => i.id !== id);
+                item.qty++;
+            } else {
+                cart.push({ ...product, qty: 1 });
             }
             renderCart();
         }
 
-        function clearCart() { cart = []; renderCart(); }
+        function updateCartQty(productId, change) {
+            const item = cart.find(c => c.id === productId);
+            if (item) {
+                item.qty += change;
+                if (item.qty <= 0) cart = cart.filter(c => c.id !== productId);
+            }
+            renderCart();
+        }
+
+        function clearCart() {
+            cart = [];
+            renderCart();
+        }
 
         function renderCart() {
-            const container = document.getElementById('cart-items');
+            const cartContainer = document.getElementById('cart-items');
             if (cart.length === 0) {
-                container.innerHTML = `<p class="text-center text-xs text-slate-400 py-6">Belum ada item dipilih</p>`;
-                document.getElementById('pos-subtotal').innerText = 'Rp 0';
-                document.getElementById('pos-ppn').innerText = 'Rp 0';
-                document.getElementById('pos-total').innerText = 'Rp 0';
-                calculateChange();
-                return;
-            }
-
-            let subtotal = 0;
-            container.innerHTML = cart.map(item => {
-                subtotal += (item.harga * item.qty);
-                return `
-                    <div class="flex justify-between items-center py-2">
+                cartContainer.innerHTML = `<p class="text-center text-xs text-slate-400 py-6">Belum ada item dipilih</p>`;
+            } else {
+                cartContainer.innerHTML = cart.map(item => `
+                    <div class="py-2 flex justify-between items-center">
                         <div>
-                            <p class="font-semibold text-xs text-slate-800">${item.nama}</p>
+                            <p class="font-semibold text-slate-700 text-xs">${item.nama}</p>
                             <p class="text-[10px] text-slate-400">Rp ${item.harga.toLocaleString('id-ID')} x ${item.qty}</p>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <button onclick="updateCartQty(${item.id}, -1)" class="w-5 h-5 bg-slate-200 text-xs rounded font-bold">-</button>
-                            <span class="text-xs font-semibold">${item.qty}</span>
-                            <button onclick="updateCartQty(${item.id}, 1)" class="w-5 h-5 bg-slate-200 text-xs rounded font-bold">+</button>
+                        <div class="flex items-center gap-1">
+                            <button onclick="updateCartQty(${item.id}, -1)" class="w-5 h-5 bg-slate-200 rounded text-xs font-bold text-slate-600 hover:bg-slate-300">-</button>
+                            <span class="text-xs font-semibold w-4 text-center">${item.qty}</span>
+                            <button onclick="updateCartQty(${item.id}, 1)" class="w-5 h-5 bg-slate-200 rounded text-xs font-bold text-slate-600 hover:bg-slate-300">+</button>
                         </div>
                     </div>
-                `;
-            }).join('');
-
-            const ppn = Math.round(subtotal * (ppnRate / 100));
-            const total = subtotal + ppn;
-
-            document.getElementById('pos-subtotal').innerText = `Rp ${subtotal.toLocaleString('id-ID')}`;
-            document.getElementById('pos-ppn').innerText = `Rp ${ppn.toLocaleString('id-ID')}`;
-            document.getElementById('pos-total').innerText = `Rp ${total.toLocaleString('id-ID')}`;
-            document.getElementById('pos-ppn-rate').innerText = ppnRate;
-
-            calculateChange();
+                `).join('');
+            }
+            calculateTotals();
         }
 
         function setPaymentMethod(method) {
             selectedPayMethod = method;
             document.querySelectorAll('.pay-method-btn').forEach(btn => {
-                btn.classList.remove('bg-blue-600', 'text-white');
-                btn.classList.add('bg-slate-100', 'text-slate-600');
+                btn.className = "pay-method-btn bg-slate-100 text-slate-600 text-xs py-1.5 rounded font-medium";
             });
-            const selectedBtn = document.getElementById('pay-btn-' + method);
-            selectedBtn.classList.remove('bg-slate-100', 'text-slate-600');
-            selectedBtn.classList.add('bg-blue-600', 'text-white');
+            document.getElementById(`pay-btn-${method}`).className = "pay-method-btn bg-blue-600 text-white text-xs py-1.5 rounded font-medium";
+            
+            const cashSection = document.getElementById('cash-payment-section');
+            if (method === 'cash') {
+                cashSection.classList.remove('hidden');
+            } else {
+                cashSection.classList.add('hidden');
+            }
+        }
 
-            const cashSec = document.getElementById('cash-payment-section');
-            if (method === 'cash') cashSec.classList.remove('hidden');
-            else cashSec.classList.add('hidden');
+        function calculateTotals() {
+            const subtotal = cart.reduce((sum, item) => sum + (item.harga * item.qty), 0);
+            const ppn = Math.round(subtotal * (ppnRate / 100));
+            const total = subtotal + ppn;
+
+            document.getElementById('pos-subtotal').innerText = `Rp ${subtotal.toLocaleString('id-ID')}`;
+            document.getElementById('pos-ppn-rate').innerText = ppnRate;
+            document.getElementById('pos-ppn').innerText = `Rp ${ppn.toLocaleString('id-ID')}`;
+            document.getElementById('pos-total').innerText = `Rp ${total.toLocaleString('id-ID')}`;
+            calculateChange();
         }
 
         function calculateChange() {
-            if (cart.length === 0) { document.getElementById('cash-change').innerText = 'Rp 0'; return; }
-            let subtotal = cart.reduce((acc, curr) => acc + (curr.harga * curr.qty), 0);
-            let total = subtotal + (subtotal * (ppnRate / 100));
-
+            const total = cart.reduce((sum, item) => sum + (item.harga * item.qty), 0) * (1 + ppnRate / 100);
             const paid = parseFloat(document.getElementById('cash-paid').value) || 0;
             const change = paid - total;
-            document.getElementById('cash-change').innerText = change > 0 ? `Rp ${Math.round(change).toLocaleString('id-ID')}` : 'Rp 0';
+            const changeDisplay = document.getElementById('cash-change');
+            if (change >= 0) {
+                changeDisplay.innerText = `Rp ${Math.round(change).toLocaleString('id-ID')}`;
+                changeDisplay.className = "font-bold text-emerald-600";
+            } else {
+                changeDisplay.innerText = `Kurang Rp ${Math.abs(Math.round(change)).toLocaleString('id-ID')}`;
+                changeDisplay.className = "font-bold text-red-500";
+            }
         }
 
         function processTransaction() {
-            if (cart.length === 0) return alert('Pilih produk terlebih dahulu!');
-            alert('Transaksi berhasil diproses!');
+            if (cart.length === 0) {
+                alert("Keranjang belanja masih kosong!");
+                return;
+            }
+            alert("Transaksi berhasil diproses!");
             clearCart();
-            document.getElementById('cash-paid').value = '';
+            document.getElementById('cash-paid').value = "";
+            calculateChange();
         }
 
-        // --- MASTER PRODUK ---
+        // --- MASTER PRODUCT FUNCTIONS ---
         function renderProductTable() {
-            const body = document.getElementById('product-table-body');
-            body.innerHTML = products.map(p => `
-                <tr>
-                    <td class="p-4"><img src="${p.gambar || 'https://via.placeholder.com/80'}" class="w-12 h-12 object-cover rounded-lg border"></td>
-                    <td class="p-4 font-semibold">${p.nama}</td>
+            const tbody = document.getElementById('product-table-body');
+            tbody.innerHTML = products.map(p => `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-4"><img src="${p.gambar || 'https://via.placeholder.com/50'}" class="w-10 h-10 object-cover rounded border"></td>
+                    <td class="p-4 font-semibold text-slate-800">${p.nama}</td>
                     <td class="p-4 text-slate-500">${p.kategori}</td>
-                    <td class="p-4 font-semibold">Rp ${p.harga.toLocaleString('id-ID')}</td>
-                    <td class="p-4"><span class="${p.status === 'Ready' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'} px-2.5 py-1 rounded-full text-xs font-semibold">${p.status}</span></td>
-                    <td class="p-4 text-right space-x-2">
-                        <button onclick="editProduct(${p.id})" class="text-blue-600 font-semibold hover:underline">Edit</button>
-                        <button onclick="deleteProduct(${p.id})" class="text-red-600 font-semibold hover:underline">Hapus</button>
+                    <td class="p-4 font-medium text-slate-700">Rp ${p.harga.toLocaleString('id-ID')}</td>
+                    <td class="p-4"><span class="px-2.5 py-1 text-xs rounded-full font-semibold ${p.status === 'Ready' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">${p.status}</span></td>
+                    <td class="p-4 text-right">
+                        <button onclick="editProduct(${p.id})" class="text-blue-600 hover:underline text-xs font-semibold mr-2">Edit</button>
+                        <button onclick="deleteProduct(${p.id})" class="text-red-500 hover:underline text-xs font-semibold">Hapus</button>
                     </td>
                 </tr>
             `).join('');
         }
 
-        function openProductModal(p = null) {
-            document.getElementById('modal-title').innerText = p ? 'Edit Produk' : 'Tambah Produk';
-            document.getElementById('modal-product-id').value = p ? p.id : '';
-            document.getElementById('modal-nama').value = p ? p.nama : '';
-            document.getElementById('modal-kategori').value = p ? p.kategori : 'Makanan';
-            document.getElementById('modal-harga').value = p ? p.harga : '';
-            document.getElementById('modal-gambar').value = p ? p.gambar : '';
-            document.getElementById('modal-status').value = p ? p.status : 'Ready';
-
-            const modal = document.getElementById('product-modal');
-            modal.classList.remove('hidden');
-            modal.classList.add('flex');
+        function openProductModal() {
+            document.getElementById('modal-product-id').value = "";
+            document.getElementById('modal-nama').value = "";
+            document.getElementById('modal-harga').value = "";
+            document.getElementById('modal-gambar').value = "";
+            document.getElementById('modal-title').innerText = "Tambah Produk Baru";
+            document.getElementById('product-modal').classList.remove('hidden');
+            document.getElementById('product-modal').classList.add('flex');
         }
 
         function closeProductModal() {
-            const modal = document.getElementById('product-modal');
-            modal.classList.add('hidden');
-            modal.classList.remove('flex');
+            document.getElementById('product-modal').classList.add('hidden');
+            document.getElementById('product-modal').classList.remove('flex');
         }
 
         function editProduct(id) {
-            const p = products.find(item => item.id === id);
-            if (p) openProductModal(p);
+            const p = products.find(x => x.id === id);
+            if (!p) return;
+            document.getElementById('modal-product-id').value = p.id;
+            document.getElementById('modal-nama').value = p.nama;
+            document.getElementById('modal-kategori').value = p.kategori;
+            document.getElementById('modal-harga').value = p.harga;
+            document.getElementById('modal-gambar').value = p.gambar;
+            document.getElementById('modal-status').value = p.status;
+            document.getElementById('modal-title').innerText = "Edit Produk";
+            document.getElementById('product-modal').classList.remove('hidden');
+            document.getElementById('product-modal').classList.add('flex');
         }
 
         function saveProductForm() {
@@ -617,39 +620,48 @@ html_code = """
             const gambar = document.getElementById('modal-gambar').value;
             const status = document.getElementById('modal-status').value;
 
-            if (!nama) return alert('Nama produk wajib diisi!');
-
-            if (id) {
-                const idx = products.findIndex(p => p.id == id);
-                if (idx !== -1) products[idx] = { id: parseInt(id), nama, kategori, harga, gambar, status };
-            } else {
-                products.push({ id: Date.now(), nama, kategori, harga, gambar, status });
+            if (!nama || harga <= 0) {
+                alert("Mohon isi nama dan harga produk dengan benar.");
+                return;
             }
 
+            if (id) {
+                const p = products.find(x => x.id == id);
+                if (p) {
+                    p.nama = nama;
+                    p.kategori = kategori;
+                    p.harga = harga;
+                    p.gambar = gambar;
+                    p.status = status;
+                }
+            } else {
+                products.push({
+                    id: Date.now(),
+                    nama, kategori, harga, gambar, status
+                });
+            }
             closeProductModal();
             renderProductTable();
         }
 
         function deleteProduct(id) {
-            if (confirm('Yakin hapus produk ini?')) {
+            if (confirm("Yakin ingin menghapus produk ini?")) {
                 products = products.filter(p => p.id !== id);
                 renderProductTable();
             }
         }
 
-        // --- BAHAN BAKU ---
+        // --- MASTER BAHAN BAKU FUNCTIONS ---
         function calcBahanGlobal() {
             const vol = parseFloat(document.getElementById('bahan-volume').value) || 0;
             const qty = parseFloat(document.getElementById('bahan-qty').value) || 0;
-            const hargaPack = parseFloat(document.getElementById('bahan-harga-pack').value) || 0;
-            const satuan = document.getElementById('bahan-satuan').value;
-
-            const totalSpend = qty * hargaPack;
+            const price = parseFloat(document.getElementById('bahan-harga-pack').value) || 0;
+            const totalSpend = qty * price;
             const totalVol = vol * qty;
-            const hargaGlobal = totalVol > 0 ? totalSpend / totalVol : 0;
+            const globalUnit = totalVol > 0 ? (totalSpend / totalVol) : 0;
 
             document.getElementById('bahan-total-spend').innerText = `Rp ${totalSpend.toLocaleString('id-ID')}`;
-            document.getElementById('bahan-harga-global').innerText = `Rp ${hargaGlobal.toFixed(2)} / ${satuan}`;
+            document.getElementById('bahan-harga-global').innerText = `Rp ${globalUnit.toFixed(2)} / Satuan`;
         }
 
         function saveBahanBaku() {
@@ -657,62 +669,70 @@ html_code = """
             const satuan = document.getElementById('bahan-satuan').value;
             const vol = parseFloat(document.getElementById('bahan-volume').value) || 0;
             const qty = parseFloat(document.getElementById('bahan-qty').value) || 0;
-            const hargaPack = parseFloat(document.getElementById('bahan-harga-pack').value) || 0;
+            const price = parseFloat(document.getElementById('bahan-harga-pack').value) || 0;
 
-            if (!nama || vol <= 0 || qty <= 0) return alert('Isi data bahan baku dengan lengkap!');
+            if (!nama || vol <= 0 || qty <= 0 || price <= 0) {
+                alert("Mohon lengkapi seluruh formulir bahan baku.");
+                return;
+            }
 
-            const totalSpend = qty * hargaPack;
-            const hargaGlobal = totalSpend / (vol * qty);
+            const totalVol = vol * qty;
+            const hargaGlobal = (qty * price) / totalVol;
 
-            bahanBakuList.push({ id: Date.now(), nama, satuan, volume: vol, qty, hargaPack, hargaGlobal });
-            alert('Bahan Baku Berhasil Disimpan!');
+            bahanBakuList.push({
+                id: Date.now(),
+                nama, satuan, volume: vol, qty, hargaPack: price, hargaGlobal
+            });
 
-            document.getElementById('bahan-nama').value = '';
-            document.getElementById('bahan-volume').value = '';
-            document.getElementById('bahan-qty').value = '';
-            document.getElementById('bahan-harga-pack').value = '';
+            alert("Bahan baku berhasil disimpan!");
+            document.getElementById('bahan-nama').value = "";
+            document.getElementById('bahan-volume').value = "";
+            document.getElementById('bahan-qty').value = "";
+            document.getElementById('bahan-harga-pack').value = "";
             calcBahanGlobal();
         }
 
-        // --- PEMBUATAN PRODUK (RESEP, HPP & MARGIN) ---
+        // --- RACIKAN / RESEP & HPP FUNCTIONS ---
         function initRacikanTab() {
             const select = document.getElementById('recipe-product-select');
-            select.innerHTML = '<option value="">-- Pilih Produk --</option>' + products.map(p => `<option value="${p.id}">${p.nama} (Rp ${p.harga.toLocaleString('id-ID')})</option>`).join('');
-
+            select.innerHTML = `<option value="">-- Pilih Produk --</option>` + products.map(p => `<option value="${p.id}">${p.nama}</option>`).join('');
+            
             const container = document.getElementById('recipe-rows-container');
-            container.innerHTML = "";
-            addRecipeRow();
-            renderRecipesTable();
+            if (container.children.length === 0) {
+                addRecipeRow();
+            }
+            renderRecipeTable();
         }
 
         function addRecipeRow() {
             const container = document.getElementById('recipe-rows-container');
-            const rowId = Date.now();
-
-            const row = document.createElement('div');
-            row.className = "flex gap-3 items-center recipe-row";
-            row.id = `row-${rowId}`;
-            row.innerHTML = `
-                <select class="flex-1 border rounded-lg p-2 text-sm recipe-bahan-select" onchange="calculateHPP()">
+            const rowId = Date.now() + Math.random();
+            const div = document.createElement('div');
+            div.className = "flex items-center gap-3 recipe-row";
+            div.id = `row-${rowId}`;
+            div.innerHTML = `
+                <select onchange="calculateHPP()" class="recipe-bahan-select flex-1 border rounded-lg p-2 text-sm">
                     <option value="">-- Pilih Bahan Baku --</option>
                     ${bahanBakuList.map(b => `<option value="${b.id}">${b.nama} (${b.satuan}) - Rp ${b.hargaGlobal.toFixed(1)}/${b.satuan}</option>`).join('')}
                 </select>
-                <input type="number" placeholder="Jumlah Pemakaian" oninput="calculateHPP()" class="w-40 border rounded-lg p-2 text-sm recipe-qty-input">
-                <button onclick="removeRecipeRow('${rowId}')" class="text-red-500 p-2 hover:bg-red-50 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                <input type="number" oninput="calculateHPP()" placeholder="Takaran" class="recipe-qty-input w-32 border rounded-lg p-2 text-sm">
+                <button onclick="removeRecipeRow('row-${rowId}')" class="text-red-500 hover:text-red-700 font-bold px-2">✕</button>
             `;
-            container.appendChild(row);
-            lucide.createIcons();
-            calculateHPP();
+            container.appendChild(div);
         }
 
         function removeRecipeRow(rowId) {
-            const row = document.getElementById(`row-${rowId}`);
+            const row = document.getElementById(rowId);
             if (row) row.remove();
             calculateHPP();
         }
 
         function calculateHPP() {
-            let totalRawCost = 0;
+            const productId = document.getElementById('recipe-product-select').value;
+            const portion = parseFloat(document.getElementById('recipe-portion').value) || 1;
+            const product = products.find(p => p.id == productId);
+
+            let totalRawCostBatch = 0;
             const rows = document.querySelectorAll('.recipe-row');
 
             rows.forEach(row => {
@@ -720,113 +740,107 @@ html_code = """
                 const qty = parseFloat(row.querySelector('.recipe-qty-input').value) || 0;
                 const bahan = bahanBakuList.find(b => b.id == bahanId);
                 if (bahan) {
-                    totalRawCost += bahan.hargaGlobal * qty;
+                    totalRawCostBatch += (bahan.hargaGlobal * qty);
                 }
             });
 
-            const porsi = parseFloat(document.getElementById('recipe-portion').value) || 1;
-            const rawCostPerPortion = totalRawCost / porsi;
+            const rawCostPerPortion = totalRawCostBatch / portion;
             const overheadVal = rawCostPerPortion * (overheadRate / 100);
-            const totalHPP = rawCostPerPortion + overheadVal;
+            const totalHppFinal = rawCostPerPortion + overheadVal;
 
             document.getElementById('hpp-bahan-raw').innerText = `Rp ${Math.round(rawCostPerPortion).toLocaleString('id-ID')}`;
-            document.getElementById('hpp-overhead-val').innerText = `Rp ${Math.round(overheadVal).toLocaleString('id-ID')}`;
-            document.getElementById('hpp-total-final').innerText = `Rp ${Math.round(totalHPP).toLocaleString('id-ID')}`;
             document.getElementById('overhead-rate-display').innerText = overheadRate;
+            document.getElementById('hpp-overhead-val').innerText = `Rp ${Math.round(overheadVal).toLocaleString('id-ID')}`;
+            document.getElementById('hpp-total-final').innerText = `Rp ${Math.round(totalHppFinal).toLocaleString('id-ID')}`;
 
-            // KALKULASI MARGIN
-            const prodId = document.getElementById('recipe-product-select').value;
-            const currentProd = products.find(p => p.id == prodId);
-            const hargaJual = currentProd ? currentProd.harga : 0;
-            const labaNominal = hargaJual - totalHPP;
-            const marginPersen = hargaJual > 0 ? (labaNominal / hargaJual) * 100 : 0;
+            if (product) {
+                const hargaJual = product.harga;
+                const labaNominal = hargaJual - totalHppFinal;
+                const marginPersen = hargaJual > 0 ? ((labaNominal / hargaJual) * 100) : 0;
 
-            document.getElementById('margin-harga-jual').innerText = `Rp ${hargaJual.toLocaleString('id-ID')}`;
-            document.getElementById('margin-laba-nominal').innerText = `Rp ${Math.round(labaNominal).toLocaleString('id-ID')}`;
-            document.getElementById('margin-persen').innerText = `${marginPersen.toFixed(2)}%`;
+                document.getElementById('margin-harga-jual').innerText = `Rp ${hargaJual.toLocaleString('id-ID')}`;
+                document.getElementById('margin-laba-nominal').innerText = `Rp ${Math.round(labaNominal).toLocaleString('id-ID')}`;
+                document.getElementById('margin-persen').innerText = `${marginPersen.toFixed(2)}%`;
+            } else {
+                document.getElementById('margin-harga-jual').innerText = `Rp 0`;
+                document.getElementById('margin-laba-nominal').innerText = `Rp 0`;
+                document.getElementById('margin-persen').innerText = `0%`;
+            }
         }
 
         function saveRecipe() {
-            const prodId = document.getElementById('recipe-product-select').value;
-            const currentProd = products.find(p => p.id == prodId);
-            if (!currentProd) return alert('Pilih Produk Jadi terlebih dahulu!');
+            const productId = document.getElementById('recipe-product-select').value;
+            const portion = parseFloat(document.getElementById('recipe-portion').value) || 1;
+            const product = products.find(p => p.id == productId);
 
-            let totalRawCost = 0;
+            if (!product) {
+                alert("Pilih produk terlebih dahulu!");
+                return;
+            }
+
             let komposisiArr = [];
-            const rows = document.querySelectorAll('.recipe-row');
+            let totalRawCostBatch = 0;
 
-            rows.forEach(row => {
+            document.querySelectorAll('.recipe-row').forEach(row => {
                 const bahanId = row.querySelector('.recipe-bahan-select').value;
                 const qty = parseFloat(row.querySelector('.recipe-qty-input').value) || 0;
                 const bahan = bahanBakuList.find(b => b.id == bahanId);
                 if (bahan && qty > 0) {
-                    totalRawCost += bahan.hargaGlobal * qty;
+                    totalRawCostBatch += (bahan.hargaGlobal * qty);
                     komposisiArr.push(`${bahan.nama} (${qty} ${bahan.satuan})`);
                 }
             });
 
-            const porsi = parseFloat(document.getElementById('recipe-portion').value) || 1;
-            const rawCostPerPortion = totalRawCost / porsi;
+            const rawCostPerPortion = totalRawCostBatch / portion;
             const overheadVal = rawCostPerPortion * (overheadRate / 100);
-            const totalHPP = Math.round(rawCostPerPortion + overheadVal);
+            const totalHppFinal = rawCostPerPortion + overheadVal;
+            const labaNominal = product.harga - totalHppFinal;
+            const marginPersen = product.harga > 0 ? ((labaNominal / product.harga) * 100) : 0;
 
-            const labaNominal = currentProd.harga - totalHPP;
-            const marginPersen = currentProd.harga > 0 ? ((labaNominal / currentProd.harga) * 100).toFixed(2) : 0;
+            recipesList = recipesList.filter(r => r.productId != productId);
+            recipesList.push({
+                productId: product.id,
+                productName: product.nama,
+                hargaJual: product.harga,
+                porsiBatch: portion,
+                hppPerPorsi: Math.round(totalHppFinal),
+                labaNominal: Math.round(labaNominal),
+                marginPersen: parseFloat(marginPersen.toFixed(2)),
+                komposisiText: komposisiArr.join(', ') || 'Tanpa komposisi'
+            });
 
-            // Update atau Tambah Ke Resep List
-            const existingIdx = recipesList.findIndex(r => r.productId == prodId);
-            const newRecipe = {
-                productId: currentProd.id,
-                productName: currentProd.nama,
-                hargaJual: currentProd.harga,
-                porsiBatch: porsi,
-                hppPerPorsi: totalHPP,
-                labaNominal: labaNominal,
-                marginPersen: marginPersen,
-                komposisiText: komposisiArr.join(', ')
-            };
-
-            if (existingIdx !== -1) {
-                recipesList[existingIdx] = newRecipe;
-            } else {
-                recipesList.push(newRecipe);
-            }
-
-            alert('Resep dan Perhitungan HPP & Margin Produk Berhasil Disimpan!');
-            renderRecipesTable();
+            alert("Resep berhasil disimpan!");
+            renderRecipeTable();
         }
 
-        function renderRecipesTable() {
-            const body = document.getElementById('recipe-table-body');
-            if (recipesList.length === 0) {
-                body.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Belum ada resep produk yang disimpan.</td></tr>`;
-                return;
-            }
-
-            body.innerHTML = recipesList.map(r => `
-                <tr>
+        function renderRecipeTable() {
+            const tbody = document.getElementById('recipe-table-body');
+            tbody.innerHTML = recipesList.map(r => `
+                <tr class="hover:bg-slate-50">
                     <td class="p-3 font-semibold text-slate-800">${r.productName}</td>
-                    <td class="p-3">Rp ${r.hargaJual.toLocaleString('id-ID')}</td>
-                    <td class="p-3 font-semibold text-blue-600">Rp ${r.hppPerPorsi.toLocaleString('id-ID')}</td>
-                    <td class="p-3 text-emerald-600 font-semibold">Rp ${r.labaNominal.toLocaleString('id-ID')}</td>
-                    <td class="p-3"><span class="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded text-xs font-bold">${r.marginPersen}%</span></td>
+                    <td class="p-3 text-slate-600">Rp ${r.hargaJual.toLocaleString('id-ID')}</td>
+                    <td class="p-3 font-medium text-blue-600">Rp ${r.hppPerPorsi.toLocaleString('id-ID')}</td>
+                    <td class="p-3 font-medium text-emerald-600">Rp ${r.labaNominal.toLocaleString('id-ID')}</td>
+                    <td class="p-3 font-bold text-emerald-700">${r.marginPersen}%</td>
                     <td class="p-3 text-xs text-slate-500 max-w-xs truncate" title="${r.komposisiText}">${r.komposisiText}</td>
                 </tr>
             `).join('');
         }
 
+        // --- SETTINGS FUNCTIONS ---
         function saveSettings() {
             overheadRate = parseFloat(document.getElementById('set-overhead-rate').value) || 0;
             ppnRate = parseFloat(document.getElementById('set-ppn-rate').value) || 0;
-            alert('Pengaturan Overhead & PPN berhasil disimpan!');
+            alert("Pengaturan persentase Overhead & PPN berhasil diperbarui!");
+            calculateTotals();
         }
 
-        document.addEventListener('DOMContentLoaded', () => {
-            switchTab('kasir');
-        });
+        // Init App
+        renderPosProducts();
+        lucide.createIcons();
     </script>
 </body>
 </html>
 """
 
-components.html(html_code, height=960, scrolling=True)
+components.html(html_code, height=900, scrolling=True)
