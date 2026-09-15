@@ -194,7 +194,6 @@ elif menu == "📦 Input & Stok Bahan Baku":
     df_mats = pd.read_sql("SELECT * FROM raw_materials", conn)
     
     if not df_mats.empty:
-        # Format Tampilan Harga Lebih Rapi
         df_display = df_mats.copy()
         df_display['cost_per_unit_formatted'] = df_display['cost_per_unit'].apply(lambda x: f"Rp {x:,.2f}" if pd.notnull(x) else "Rp 0")
         
@@ -235,7 +234,6 @@ elif menu == "📦 Input & Stok Bahan Baku":
                 st.warning("Bahan baku berhasil dihapus!")
                 st.rerun()
 
-        # Deteksi Bahan Menipis
         low_stock = df_mats[df_mats['stock'] < 10]
         if not low_stock.empty:
             st.warning("⚠️ **Peringatan Bahan Baku Menipis (< 10 unit):**")
@@ -244,7 +242,7 @@ elif menu == "📦 Input & Stok Bahan Baku":
         st.info("Belum ada data bahan baku.")
 
 # ---------------------------------------------------------
-# MENU 3: KELOLA PRODUK & PERHITUNGAN HPP
+# MENU 3: KELOLA PRODUK & PERHITUNGAN HPP (LOGIKA RESEP REVISI)
 # ---------------------------------------------------------
 elif menu == "🍔 Kelola Produk & Perhitungan HPP":
     st.header("🍔 Kelola Produk & Kalkulasi HPP (Bahan + Overhead)")
@@ -262,7 +260,7 @@ elif menu == "🍔 Kelola Produk & Perhitungan HPP":
     st.info(f"💡 **Beban Biaya Overhead per Satuan Produk:** Rp {overhead_per_pcs:,.2f}")
 
     st.markdown("---")
-    st.subheader("2. Tambah Produk Jualan & Resep Bahan Baku")
+    st.subheader("2. Tambah Produk Jualan & Simulasi Resep Adonan")
     
     col_p1, col_p2 = st.columns(2)
     with col_p1:
@@ -271,27 +269,37 @@ elif menu == "🍔 Kelola Produk & Perhitungan HPP":
     with col_p2:
         p_img = st.file_uploader("Upload Foto Produk (Opsional)", type=["jpg", "png", "jpeg"])
 
+    st.markdown("#### 🥣 Perhitungan Resep Sekali Buat (Batch/Adonan)")
+    yield_qty = st.number_input("Sekali buat resep ini, jadi berapa porsi/pcs?", min_value=1.0, value=1.0, step=1.0)
+
     mats_df = pd.read_sql("SELECT id, name, unit, cost_per_unit FROM raw_materials", conn)
     
-    selected_recipe = []
-    hpp_bahan = 0.0
+    selected_recipe_per_portion = []
+    total_batch_cost = 0.0
     
-    st.write("**Resep Bahan Baku yang Digunakan:**")
+    st.write("**Bahan Baku yang Digunakan untuk Sekali Buat (1 Batch/Adonan):**")
     if not mats_df.empty:
         for idx, row in mats_df.iterrows():
-            qty_used = st.number_input(f"Penggunaan {row['name']} ({row['unit']}) per Porsi", min_value=0.0, key=f"mat_{row['id']}")
-            if qty_used > 0:
-                cost = qty_used * row['cost_per_unit']
-                hpp_bahan += cost
-                selected_recipe.append((row['id'], qty_used))
+            batch_qty = st.number_input(f"Bahan {row['name']} ({row['unit']}) yang dipakai sekali buat", min_value=0.0, key=f"mat_{row['id']}")
+            if batch_qty > 0:
+                cost_material = batch_qty * row['cost_per_unit']
+                total_batch_cost += cost_material
                 
-        total_hpp_satuan = hpp_bahan + overhead_per_pcs
+                # Menghitung porsi/penggunaan per 1 pcs untuk pemotongan stok otomatis saat kasir
+                qty_per_portion = batch_qty / yield_qty
+                selected_recipe_per_portion.append((row['id'], qty_per_portion))
+                
+        # Perhitungan HPP per Porsi
+        hpp_bahan_per_porsi = total_batch_cost / yield_qty
+        total_hpp_satuan = hpp_bahan_per_porsi + overhead_per_pcs
         
         st.markdown(f"""
-        ### 📊 Ringkasan HPP Produk:
-        * **HPP Bahan Baku:** Rp {hpp_bahan:,.2f}
-        * **Biaya Overhead:** Rp {overhead_per_pcs:,.2f}
-        * **TOTAL HPP SATUAN:** **Rp {total_hpp_satuan:,.2f}**
+        ### 📊 Ringkasan Kalkulasi HPP:
+        * **Total Biaya Bahan 1 Adonan:** Rp {total_batch_cost:,.2f}
+        * **Hasil Adonan:** {yield_qty:,.0f} Porsi / Pcs
+        * **HPP Bahan per Porsi:** Rp {hpp_bahan_per_porsi:,.2f}
+        * **Biaya Overhead per Porsi:** Rp {overhead_per_pcs:,.2f}
+        * **TOTAL HPP PER PORSI:** **Rp {total_hpp_satuan:,.2f}**
         * **Estimasi Margin Keuntungan:** Rp {p_price - total_hpp_satuan:,.2f}
         """)
         
@@ -300,8 +308,8 @@ elif menu == "🍔 Kelola Produk & Perhitungan HPP":
                 img_path = save_uploaded_file(p_img)
                 c.execute("INSERT INTO products (name, price, hpp, image) VALUES (?, ?, ?, ?)", (p_name, p_price, total_hpp_satuan, img_path))
                 p_id = c.lastrowid
-                for m_id, q in selected_recipe:
-                    c.execute("INSERT INTO recipes (product_id, material_id, qty) VALUES (?, ?, ?)", (p_id, m_id, q))
+                for m_id, q_per_porsi in selected_recipe_per_portion:
+                    c.execute("INSERT INTO recipes (product_id, material_id, qty) VALUES (?, ?, ?)", (p_id, m_id, q_per_porsi))
                 conn.commit()
                 st.success(f"Produk '{p_name}' berhasil disimpan!")
                 st.rerun()
