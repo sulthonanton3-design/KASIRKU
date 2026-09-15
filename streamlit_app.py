@@ -26,7 +26,7 @@ c.execute('''CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY, da
 c.execute('''CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)''')
 conn.commit()
 
-# Autoupdate skema database
+# Autoupdate skema database jika kolom belum ada
 try:
     c.execute("ALTER TABLE products ADD COLUMN sku TEXT")
 except:
@@ -47,7 +47,7 @@ conn.commit()
 c.execute("INSERT OR IGNORE INTO users VALUES (1, 'admin', 'admin123', 'Admin')")
 c.execute("INSERT OR IGNORE INTO settings VALUES ('receipt_header', 'SELAMAT DATANG DI TOKO KAMI')")
 c.execute("INSERT OR IGNORE INTO settings VALUES ('receipt_footer', 'Terima Kasih Atas Kunjungan Anda!')")
-c.execute("INSERT OR IGNORE INTO settings VALUES ('overhead_percent', '20')") # Default Overhead 20%
+c.execute("INSERT OR IGNORE INTO settings VALUES ('overhead_percent', '20')")  # Default Overhead 20%
 conn.commit()
 
 # ---------------------------------------------------------
@@ -116,6 +116,7 @@ if menu == "🛒 Kasir (POS)":
     with col_catalog:
         search_query = st.text_input("🔍 Scan barcode / cari nama produk...", placeholder="Ketik nama atau SKU...")
         
+        # Tampilkan produk yang BUKAN draft
         products = pd.read_sql("SELECT * FROM products WHERE is_draft = 0 OR is_draft IS NULL", conn)
         
         if search_query and not products.empty:
@@ -224,7 +225,7 @@ elif menu == "📝 Kelola & Edit Produk":
     with f_col1:
         search_kw = st.text_input("Cari", placeholder="🔍 Cari nama, SKU, barcode...", label_visibility="collapsed")
     with f_col2:
-        cat_filter = st.selectbox("Kategori", ["Semua Kategori", "Aksesoris", "Rumah Tangga", "Peralatan Olahraga", "Makanan/Minuman"], label_visibility="collapsed")
+        cat_filter = st.selectbox("Kategori", ["Semua Kategori", "Kopi", "Non-Kopi", "Dessert", "Main Course", "Lain-Lain"], label_visibility="collapsed")
     with f_col3:
         status_filter = st.selectbox("Status", ["Semua Status", "Aktif", "Draft"], label_visibility="collapsed")
     with f_col4:
@@ -237,11 +238,17 @@ elif menu == "📝 Kelola & Edit Produk":
     if df_products.empty:
         st.info("Belum ada data produk terdaftar. Silakan buat produk baru melalui menu 'Buat Produk & Kalkulasi HPP'.")
     else:
+        # Filter Status
         if status_filter == "Aktif":
             df_products = df_products[(df_products['is_draft'] == 0) | (df_products['is_draft'].isna())]
         elif status_filter == "Draft":
             df_products = df_products[df_products['is_draft'] == 1]
 
+        # Filter Kategori
+        if cat_filter != "Semua Kategori":
+            df_products = df_products[df_products['category'] == cat_filter]
+
+        # Filter Pencarian Kata Kunci
         if search_kw:
             df_products = df_products[
                 df_products['name'].str.contains(search_kw, case=False, na=False) |
@@ -278,7 +285,7 @@ elif menu == "📝 Kelola & Edit Produk":
                 st.markdown(f"**{row['name'] if row['name'] else '(Tanpa Nama)'}**")
 
             with c4:
-                cat_val = row.get('category') if pd.notnull(row.get('category')) and row.get('category') != '' else "Umum"
+                cat_val = row.get('category') if pd.notnull(row.get('category')) and row.get('category') != '' else "Lain-Lain"
                 st.write(cat_val)
 
             with c5:
@@ -321,7 +328,7 @@ elif menu == "📦 Input & Stok Bahan Baku":
     with st.expander("➕ Tambah Bahan Baku Baru"):
         col1, col2 = st.columns(2)
         with col1:
-            name = st.text_input("Nama Bahan Baku (Contoh: Whipcream, Cocoa Powder)")
+            name = st.text_input("Nama Bahan Baku (Contoh: Biji Kopi, Milk, Syrup Vanilla)")
             unit = st.selectbox("Satuan", ["Gram", "ML", "Pcs", "Kg", "Liter"])
             img_file = st.file_uploader("Upload Gambar Bahan Baku (Opsional)", type=["jpg", "png", "jpeg"])
         with col2:
@@ -412,10 +419,11 @@ elif menu == "🍔 Buat Produk & Kalkulasi HPP":
         p_sku = st.text_input("SKU / Barcode", placeholder="Contoh: DPT-000036 (Opsional)")
         p_name = st.text_input("Nama Produk Jualan")
     with col_p2:
-        p_category = st.selectbox("Kategori", ["Aksesoris", "Rumah Tangga", "Peralatan Olahraga", "Makanan/Minuman", "Lainnya"])
+        # Kategori Khusus Cafe / F&B
+        p_category = st.selectbox("Kategori", ["Kopi", "Non-Kopi", "Dessert", "Main Course", "Lain-Lain"])
         p_price = st.number_input("Harga Jual Produk (Rp)", min_value=0.0)
     with col_p3:
-        p_stock = st.number_input("Stok Awal Jualan (Pcs)", min_value=1.0, value=100.0)
+        p_stock = st.number_input("Stok Awal Jualan (Pcs/Porsi)", min_value=1.0, value=100.0, help="Jumlah porsi/unit yang siap dijual. Untuk menu yang dibuat saat ada pesanan, isi secukupnya (misal: 100).")
         p_img = st.file_uploader("Upload Foto Produk (Opsional)", type=["jpg", "png", "jpeg"])
 
     st.markdown("---")
@@ -439,7 +447,7 @@ elif menu == "🍔 Buat Produk & Kalkulasi HPP":
                 
         # Perhitungan HPP Otomatis
         hpp_bahan_per_porsi = total_batch_cost / yield_qty
-        overhead_per_porsi = hpp_bahan_per_porsi * (overhead_pct / 100.0) # Tambahan Overhead otomatis dari HPP Bahan
+        overhead_per_porsi = hpp_bahan_per_porsi * (overhead_pct / 100.0) # Tambahan Overhead dari HPP Bahan
         total_hpp_satuan = hpp_bahan_per_porsi + overhead_per_porsi
         
         profit_per_porsi = p_price - total_hpp_satuan
@@ -476,7 +484,7 @@ elif menu == "🍔 Buat Produk & Kalkulasi HPP":
                     for m_id, q_per_porsi in selected_recipe_per_portion:
                         c.execute("INSERT INTO recipes (product_id, material_id, qty) VALUES (?, ?, ?)", (p_id, m_id, q_per_porsi))
                     conn.commit()
-                    st.success(f"Produk '{p_name}' berhasil dipublikasikan & siap dijual!")
+                    st.success(f"Produk '{p_name}' ({p_category}) berhasil dipublikasikan & siap dijual!")
                     st.rerun()
                 else:
                     st.error("Isi nama produk dan harga jual terlebih dahulu!")
