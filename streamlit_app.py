@@ -17,23 +17,41 @@ if not os.path.exists(UPLOAD_DIR):
 conn = sqlite3.connect('pos_hpp_system.db', check_same_thread=False)
 c = conn.cursor()
 
-# Membuat tabel-tabel jika belum ada
+# Membuat tabel-tabel utama jika belum ada
 c.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT, password TEXT, role TEXT)''')
 c.execute('''CREATE TABLE IF NOT EXISTS raw_materials (id INTEGER PRIMARY KEY, name TEXT, unit TEXT, stock REAL, cost_per_unit REAL, image TEXT)''')
-c.execute('''CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, name TEXT, price REAL, hpp REAL, stock REAL DEFAULT 100, image TEXT)''')
+c.execute('''CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, sku TEXT, name TEXT, category TEXT, price REAL, hpp REAL, stock REAL DEFAULT 100, image TEXT, is_draft INTEGER DEFAULT 0)''')
 c.execute('''CREATE TABLE IF NOT EXISTS recipes (id INTEGER PRIMARY KEY, product_id INT, material_id INT, qty REAL)''')
 c.execute('''CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY, date TEXT, total REAL, payment_method TEXT, user TEXT)''')
 c.execute('''CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)''')
 conn.commit()
 
-# Default admin & settings
+# Autoupdate skema database
+try:
+    c.execute("ALTER TABLE products ADD COLUMN sku TEXT")
+except:
+    pass
+
+try:
+    c.execute("ALTER TABLE products ADD COLUMN category TEXT")
+except:
+    pass
+
+try:
+    c.execute("ALTER TABLE products ADD COLUMN is_draft INTEGER DEFAULT 0")
+except:
+    pass
+conn.commit()
+
+# Default Settings & Admin
 c.execute("INSERT OR IGNORE INTO users VALUES (1, 'admin', 'admin123', 'Admin')")
 c.execute("INSERT OR IGNORE INTO settings VALUES ('receipt_header', 'SELAMAT DATANG DI TOKO KAMI')")
 c.execute("INSERT OR IGNORE INTO settings VALUES ('receipt_footer', 'Terima Kasih Atas Kunjungan Anda!')")
+c.execute("INSERT OR IGNORE INTO settings VALUES ('overhead_percent', '20')") # Default Overhead 20%
 conn.commit()
 
 # ---------------------------------------------------------
-# AUTHENTICATION
+# AUTHENTICATION & CONFIG
 # ---------------------------------------------------------
 st.set_page_config(page_title="Sistem POS & HPP Modern", layout="wide")
 
@@ -73,7 +91,7 @@ menu = st.sidebar.radio("Navigasi Menu", [
     "📦 Input & Stok Bahan Baku",
     "🍔 Buat Produk & Kalkulasi HPP",
     "📊 Laporan Transaksi & Analisis",
-    "⚙️ Pengaturan Struk & Printer",
+    "⚙️ Pengaturan System & Overhead",
     "👥 Kelola User"
 ])
 
@@ -81,7 +99,6 @@ if st.sidebar.button("Logout"):
     st.session_state['logged_in'] = False
     st.rerun()
 
-# Helper fungsi simpan gambar
 def save_uploaded_file(uploaded_file):
     if uploaded_file is not None:
         file_path = os.path.join(UPLOAD_DIR, uploaded_file.name)
@@ -91,24 +108,27 @@ def save_uploaded_file(uploaded_file):
     return None
 
 # ---------------------------------------------------------
-# MENU 1: KASIR (POS LAYOUT MODERN)
+# MENU 1: KASIR (POS)
 # ---------------------------------------------------------
 if menu == "🛒 Kasir (POS)":
     col_catalog, col_cart = st.columns([2.5, 1.2])
     
     with col_catalog:
-        search_query = st.text_input("🔍 Scan barcode / cari nama produk...", placeholder="Ketik nama produk untuk mencari...")
+        search_query = st.text_input("🔍 Scan barcode / cari nama produk...", placeholder="Ketik nama atau SKU...")
         
-        products = pd.read_sql("SELECT * FROM products", conn)
+        products = pd.read_sql("SELECT * FROM products WHERE is_draft = 0 OR is_draft IS NULL", conn)
         
-        if search_query:
-            products = products[products['name'].str.contains(search_query, case=False, na=False)]
+        if search_query and not products.empty:
+            products = products[
+                products['name'].str.contains(search_query, case=False, na=False) |
+                products['sku'].astype(str).str.contains(search_query, case=False, na=False)
+            ]
             
         if 'cart' not in st.session_state:
             st.session_state['cart'] = []
 
         if products.empty:
-            st.info("Tidak ada produk ditemukan.")
+            st.info("Tidak ada produk aktif ditemukan.")
         else:
             cols = st.columns(4)
             for idx, row in products.reset_index(drop=True).iterrows():
@@ -121,9 +141,8 @@ if menu == "🛒 Kasir (POS)":
                         st.markdown(f"**{row['name']}**")
                         st.markdown(f"<h5 style='color: #1E88E5; margin:0;'>Rp {row['price']:,.0f}</h5>", unsafe_allow_html=True)
                         
-                        # Pengambilan nilai stok yang aman agar tidak KeyError
-                        stock_val = row.get('stock', 100)
-                        st.caption(f"Stok: {stock_val}")
+                        stock_val = row.get('stock', 100) if pd.notnull(row.get('stock')) else 100
+                        st.caption(f"Stok: {stock_val:g}")
                         
                         if st.button(f"➕ Tambah", key=f"btn_add_{row['id']}", use_container_width=True):
                             st.session_state['cart'].append({"id": row['id'], "name": row['name'], "price": row['price']})
@@ -164,13 +183,11 @@ if menu == "🛒 Kasir (POS)":
                               (now, total, pay_method, st.session_state['username']))
                     
                     for _, item in summary.iterrows():
-                        # Kurangi stok produk jika kolom ada
                         try:
                             c.execute("UPDATE products SET stock = stock - ? WHERE id=?", (item['qty'], item['id']))
                         except:
                             pass
                             
-                        # Potong stok bahan baku berdasarkan resep
                         c.execute("SELECT material_id, qty FROM recipes WHERE product_id=?", (item['id'],))
                         recipes = c.fetchall()
                         for mat_id, req_qty in recipes:
@@ -190,54 +207,47 @@ if menu == "🛒 Kasir (POS)":
                 st.info("Keranjang kosong. Klik produk di sebelah kiri untuk menambahkan.")
 
 # ---------------------------------------------------------
-# MENU: PRODUK (DESAIN MODERN KANBAN / LIST TABEL)
+# MENU 2: KELOLA & EDIT PRODUK
 # ---------------------------------------------------------
 elif menu == "📝 Kelola & Edit Produk":
-    # 1. Header & Action Buttons Utama
-    col_hdr1, col_hdr2 = st.columns([3, 2])
+    col_hdr1, col_hdr2 = st.columns([3, 1])
     with col_hdr1:
         st.title("Produk")
         st.caption("Kelola produk, barcode, harga jual & HPP")
     with col_hdr2:
-        st.write("") # Spacer
-        btn_col1, btn_col2, btn_col3 = st.columns([1, 1.5, 1.5])
-        with btn_col1:
-            st.button("⬇️ CSV", use_container_width=True)
-        with btn_col2:
-            st.button("⚡ + Tambah Massal", use_container_width=True)
-        with btn_col3:
-            if st.button("➕ Tambah Produk", type="primary", use_container_width=True):
-                st.session_state['show_add_modal'] = True
+        st.write("") 
+        st.button("⬇️ CSV", use_container_width=True)
 
     st.markdown("---")
 
-    # 2. Filter Bar (Pencarian & Dropdown Filter)
     f_col1, f_col2, f_col3, f_col4 = st.columns([4, 2, 2, 0.5])
     with f_col1:
         search_kw = st.text_input("Cari", placeholder="🔍 Cari nama, SKU, barcode...", label_visibility="collapsed")
     with f_col2:
-        cat_filter = st.selectbox("Kategori", ["Semua Kategori", "Aksesoris", "Rumah Tangga", "Peralatan Olahraga"], label_visibility="collapsed")
+        cat_filter = st.selectbox("Kategori", ["Semua Kategori", "Aksesoris", "Rumah Tangga", "Peralatan Olahraga", "Makanan/Minuman"], label_visibility="collapsed")
     with f_col3:
-        status_filter = st.selectbox("Status", ["Semua Status", "Aktif", "Non-Aktif"], label_visibility="collapsed")
+        status_filter = st.selectbox("Status", ["Semua Status", "Aktif", "Draft"], label_visibility="collapsed")
     with f_col4:
         st.button("🔄", help="Reset Filter", use_container_width=True)
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # 3. Fetch Data Produk dari Database
     df_products = pd.read_sql("SELECT * FROM products", conn)
 
     if df_products.empty:
-        st.info("Belum ada data produk terdaftar.")
+        st.info("Belum ada data produk terdaftar. Silakan buat produk baru melalui menu 'Buat Produk & Kalkulasi HPP'.")
     else:
-        # Terapkan filter jika user melakukan pencarian
+        if status_filter == "Aktif":
+            df_products = df_products[(df_products['is_draft'] == 0) | (df_products['is_draft'].isna())]
+        elif status_filter == "Draft":
+            df_products = df_products[df_products['is_draft'] == 1]
+
         if search_kw:
             df_products = df_products[
                 df_products['name'].str.contains(search_kw, case=False, na=False) |
-                df_products.get('sku', pd.Series(['']*len(df_products))).str.contains(search_kw, case=False, na=False)
+                df_products['sku'].astype(str).str.contains(search_kw, case=False, na=False)
             ]
 
-        # Header Tabel Kustom
         h1, h2, h3, h4, h5, h6, h7, h8, h9 = st.columns([0.8, 1.5, 2.5, 1.8, 1.5, 1.5, 1.0, 1.0, 1.2])
         with h1: st.caption("**GAMBAR**")
         with h2: st.caption("**SKU/BARCODE**")
@@ -251,62 +261,57 @@ elif menu == "📝 Kelola & Edit Produk":
 
         st.divider()
 
-        # Render Baris Produk
         for idx, row in df_products.iterrows():
             c1, c2, c3, c4, c5, c6, c7, c8, c9 = st.columns([0.8, 1.5, 2.5, 1.8, 1.5, 1.5, 1.0, 1.0, 1.2])
             
-            # 1. Gambar
             with c1:
                 if row['image'] and os.path.exists(row['image']):
                     st.image(row['image'], width=45)
                 else:
                     st.markdown("🖼️")
 
-            # 2. SKU / Barcode
             with c2:
-                sku_val = row.get('sku', f"DPT-{row['id']:06d}")
+                sku_val = row.get('sku') if pd.notnull(row.get('sku')) and row.get('sku') != '' else f"DPT-{row['id']:06d}"
                 st.caption(f"`{sku_val}`")
 
-            # 3. Nama Produk
             with c3:
-                st.markdown(f"**{row['name']}**")
+                st.markdown(f"**{row['name'] if row['name'] else '(Tanpa Nama)'}**")
 
-            # 4. Kategori
             with c4:
-                cat_val = row.get('category', 'Aksesoris')
+                cat_val = row.get('category') if pd.notnull(row.get('category')) and row.get('category') != '' else "Umum"
                 st.write(cat_val)
 
-            # 5. Harga Jual
             with c5:
                 st.markdown(f"**Rp {row['price']:,.0f}**")
 
-            # 6. HPP
             with c6:
                 hpp_val = row['hpp'] if pd.notnull(row['hpp']) else 0
                 st.caption(f"Rp {hpp_val:,.0f} ⚙️")
 
-            # 7. Stok
             with c7:
-                st_val = row.get('stock', 0)
+                st_val = row.get('stock', 0) if pd.notnull(row.get('stock')) else 0
                 st.write(f"{st_val:g} pcs")
 
-            # 8. Status (Badge)
             with c8:
-                st.markdown("<span style='background-color:#D4EDDA; color:#155724; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:bold;'>Aktif</span>", unsafe_allow_html=True)
+                if row.get('is_draft') == 1:
+                    st.markdown("<span style='background-color:#FFF3CD; color:#856404; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:bold;'>Draft</span>", unsafe_allow_html=True)
+                else:
+                    st.markdown("<span style='background-color:#D4EDDA; color:#155724; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:bold;'>Aktif</span>", unsafe_allow_html=True)
 
-            # 9. Tombol Edit & Delete
             with c9:
                 act_col1, act_col2 = st.columns(2)
                 with act_col1:
-                    if st.button("Edit", key=f"edt_{row['id']}", type="secondary"):
+                    if st.button("Edit", key=f"edt_{row['id']}"):
                         st.session_state['edit_product_id'] = row['id']
                 with act_col2:
                     if st.button("❌", key=f"del_{row['id']}"):
                         c.execute("DELETE FROM products WHERE id=?", (row['id'],))
+                        c.execute("DELETE FROM recipes WHERE product_id=?", (row['id'],))
                         conn.commit()
                         st.rerun()
 
             st.markdown("<hr style='margin: 4px 0; border: 0.5px solid #f0f2f6;'>", unsafe_allow_html=True)
+
 # ---------------------------------------------------------
 # MENU 3: INPUT & STOK BAHAN BAKU
 # ---------------------------------------------------------
@@ -387,35 +392,34 @@ elif menu == "📦 Input & Stok Bahan Baku":
         st.info("Belum ada data bahan baku.")
 
 # ---------------------------------------------------------
-# MENU 4: BUAT PRODUK & PERHITUNGAN HPP
+# MENU 4: BUAT PRODUK & KALKULASI HPP (OTOMATIS + OVERHEAD GLOBAL)
 # ---------------------------------------------------------
 elif menu == "🍔 Buat Produk & Kalkulasi HPP":
     st.header("🍔 Buat Produk Baru & Kalkulasi HPP")
     
-    st.subheader("1. Input Biaya Operasional (Overhead)")
-    col_a, col_b = st.columns(2)
-    with col_a:
-        b_listrik = st.number_input("Biaya Listrik & Air / Bulan (Rp)", value=500000)
-        b_tenaga = st.number_input("Biaya Tenaga Kerja / Bulan (Rp)", value=2000000)
-    with col_b:
-        b_bensin = st.number_input("Biaya Operasional / Bensin / Bulan (Rp)", value=300000)
-        est_penjualan = st.number_input("Estimasi Total Produk Terjual / Bulan (Pcs)", value=1000)
-    
-    overhead_per_pcs = (b_listrik + b_tenaga + b_bensin) / (est_penjualan if est_penjualan > 0 else 1)
-    st.info(f"💡 **Beban Biaya Overhead per Satuan Produk:** Rp {overhead_per_pcs:,.2f}")
+    # Ambil persentase overhead dari pengaturan DB
+    c.execute("SELECT value FROM settings WHERE key='overhead_percent'")
+    res_ovh = c.fetchone()
+    overhead_pct = float(res_ovh[0]) if res_ovh else 20.0
+
+    st.info(f"💡 **Persentase Overhead Otomatis Aktif:** {overhead_pct}% (Dapat diubah di menu Pengaturan)")
 
     st.markdown("---")
-    st.subheader("2. Resep Adonan & Input Produk")
+    st.subheader("1. Informasi Produk Jualan")
     
-    col_p1, col_p2 = st.columns(2)
+    col_p1, col_p2, col_p3 = st.columns(3)
     with col_p1:
+        p_sku = st.text_input("SKU / Barcode", placeholder="Contoh: DPT-000036 (Opsional)")
         p_name = st.text_input("Nama Produk Jualan")
-        p_price = st.number_input("Harga Jual Produk (Rp)", min_value=0.0)
-        p_stock = st.number_input("Stok Awal Jualan (Pcs)", min_value=1.0, value=100.0)
     with col_p2:
+        p_category = st.selectbox("Kategori", ["Aksesoris", "Rumah Tangga", "Peralatan Olahraga", "Makanan/Minuman", "Lainnya"])
+        p_price = st.number_input("Harga Jual Produk (Rp)", min_value=0.0)
+    with col_p3:
+        p_stock = st.number_input("Stok Awal Jualan (Pcs)", min_value=1.0, value=100.0)
         p_img = st.file_uploader("Upload Foto Produk (Opsional)", type=["jpg", "png", "jpeg"])
 
-    st.markdown("#### 🥣 Perhitungan Resep Sekali Buat (Batch/Adonan)")
+    st.markdown("---")
+    st.subheader("2. Resep Adonan & Bahan Baku")
     yield_qty = st.number_input("Sekali buat resep ini, jadi berapa porsi/pcs?", min_value=1.0, value=1.0, step=1.0)
 
     mats_df = pd.read_sql("SELECT id, name, unit, cost_per_unit FROM raw_materials", conn)
@@ -433,9 +437,11 @@ elif menu == "🍔 Buat Produk & Kalkulasi HPP":
                 qty_per_portion = batch_qty / yield_qty
                 selected_recipe_per_portion.append((row['id'], qty_per_portion))
                 
-        # Perhitungan HPP per Porsi
+        # Perhitungan HPP Otomatis
         hpp_bahan_per_porsi = total_batch_cost / yield_qty
-        total_hpp_satuan = hpp_bahan_per_porsi + overhead_per_pcs
+        overhead_per_porsi = hpp_bahan_per_porsi * (overhead_pct / 100.0) # Tambahan Overhead otomatis dari HPP Bahan
+        total_hpp_satuan = hpp_bahan_per_porsi + overhead_per_porsi
+        
         profit_per_porsi = p_price - total_hpp_satuan
         margin_percent = (profit_per_porsi / p_price * 100) if p_price > 0 else 0.0
         
@@ -444,7 +450,7 @@ elif menu == "🍔 Buat Produk & Kalkulasi HPP":
         
         c_m1, c_m2, c_m3 = st.columns(3)
         c_m1.metric("HPP Bahan / Porsi", f"Rp {hpp_bahan_per_porsi:,.2f}")
-        c_m2.metric("Overhead / Porsi", f"Rp {overhead_per_pcs:,.2f}")
+        c_m2.metric(f"Biaya Overhead ({overhead_pct}%)", f"Rp {overhead_per_porsi:,.2f}")
         c_m3.metric("TOTAL HPP PER PORSI", f"Rp {total_hpp_satuan:,.2f}")
         
         c_m4, c_m5 = st.columns(2)
@@ -452,55 +458,46 @@ elif menu == "🍔 Buat Produk & Kalkulasi HPP":
         c_m5.metric("Persentase Keuntungan (Margin %)", f"{margin_percent:.2f}%")
 
         st.markdown("---")
-        st.subheader("🎯 4. Simulasi Target Profit & Estimasi Modal")
         
-        sim_col1, sim_col2 = st.columns(2)
-        with sim_col1:
-            st.markdown("##### 📌 Opsi A: Berdasarkan Target Profit Bulanan")
-            target_profit_monthly = st.number_input("Target Profit Bersih / Bulan (Rp)", value=5000000, step=500000)
-            if profit_per_porsi > 0:
-                pcs_needed = target_profit_monthly / profit_per_porsi
-                omset_needed = pcs_needed * p_price
-                capital_needed = pcs_needed * hpp_bahan_per_porsi
-                
-                st.write(f"* Untuk profit **Rp {target_profit_monthly:,.0f}/bulan**:")
-                st.write(f"  - Wajib Terjual: **{pcs_needed:,.0f} Pcs/Bulan** (~{pcs_needed/30:,.0f} pcs/hari)")
-                st.write(f"  - Target Omset: **Rp {omset_needed:,.0f}**")
-                st.write(f"  - Estimasi Modal Bahan: **Rp {capital_needed:,.0f}**")
-            else:
-                st.warning("Harga jual harus lebih tinggi dari HPP untuk menghitung target!")
+        # Tombol Simpan
+        btn_col1, btn_col2 = st.columns(2)
+        with btn_col1:
+            if st.button("💾 Simpan Produk Jualan (Aktif)", type="primary", use_container_width=True):
+                if p_name and p_price > 0:
+                    img_path = save_uploaded_file(p_img)
+                    final_sku = p_sku if p_sku else f"DPT-{int(datetime.now().timestamp())}"
+                    
+                    c.execute("""
+                        INSERT INTO products (sku, name, category, price, hpp, stock, image, is_draft) 
+                        VALUES (?, ?, ?, ?, ?, ?, ?, 0)
+                    """, (final_sku, p_name, p_category, p_price, total_hpp_satuan, p_stock, img_path))
+                                  
+                    p_id = c.lastrowid
+                    for m_id, q_per_porsi in selected_recipe_per_portion:
+                        c.execute("INSERT INTO recipes (product_id, material_id, qty) VALUES (?, ?, ?)", (p_id, m_id, q_per_porsi))
+                    conn.commit()
+                    st.success(f"Produk '{p_name}' berhasil dipublikasikan & siap dijual!")
+                    st.rerun()
+                else:
+                    st.error("Isi nama produk dan harga jual terlebih dahulu!")
 
-        with sim_col2:
-            st.markdown("##### 📌 Opsi B: Estimasi Modal Berdasarkan Rencana Produksi")
-            plan_pcs = st.number_input("Rencana Jumlah Produksi (Pcs)", value=500, step=50)
-            modal_bahan = plan_pcs * hpp_bahan_per_porsi
-            est_omset = plan_pcs * p_price
-            est_profit = plan_pcs * profit_per_porsi
-            
-            st.write(f"* Untuk produksi **{plan_pcs:,.0f} Pcs**:")
-            st.write(f"  - **Estimasi Modal Bahan:** **Rp {modal_bahan:,.0f}**")
-            st.write(f"  - Potensi Omset: **Rp {est_omset:,.0f}**")
-            st.write(f"  - Potensi Profit Bersih: **Rp {est_profit:,.0f}**")
-
-        st.markdown("---")
-        if st.button("💾 Simpan Produk Jualan", type="primary"):
-            if p_name and p_price > 0:
+        with btn_col2:
+            if st.button("📝 Simpan Sebagai Draft", use_container_width=True):
+                draft_name = p_name if p_name else "Draft Produk (Belum Selesai)"
                 img_path = save_uploaded_file(p_img)
-                try:
-                    c.execute("INSERT INTO products (name, price, hpp, stock, image) VALUES (?, ?, ?, ?, ?)",
-                              (p_name, p_price, total_hpp_satuan, p_stock, img_path))
-                except:
-                    c.execute("INSERT INTO products (name, price, hpp, image) VALUES (?, ?, ?, ?)",
-                              (p_name, p_price, total_hpp_satuan, img_path))
+                final_sku = p_sku if p_sku else f"DPT-{int(datetime.now().timestamp())}"
+                
+                c.execute("""
+                    INSERT INTO products (sku, name, category, price, hpp, stock, image, is_draft) 
+                    VALUES (?, ?, ?, ?, ?, ?, ?, 1)
+                """, (final_sku, draft_name, p_category, p_price, total_hpp_satuan, p_stock, img_path))
                               
                 p_id = c.lastrowid
                 for m_id, q_per_porsi in selected_recipe_per_portion:
                     c.execute("INSERT INTO recipes (product_id, material_id, qty) VALUES (?, ?, ?)", (p_id, m_id, q_per_porsi))
                 conn.commit()
-                st.success(f"Produk '{p_name}' berhasil disimpan!")
+                st.warning(f"Produk '{draft_name}' berhasil disimpan ke Draft.")
                 st.rerun()
-            else:
-                st.error("Isi nama produk dan harga jual terlebih dahulu!")
     else:
         st.warning("Tambahkan bahan baku terlebih dahulu di menu Bahan Baku!")
 
@@ -527,10 +524,29 @@ elif menu == "📊 Laporan Transaksi & Analisis":
         st.info("Belum ada data transaksi yang tercatat.")
 
 # ---------------------------------------------------------
-# MENU 6: PENGATURAN STRUK
+# MENU 6: PENGATURAN SYSTEM & OVERHEAD
 # ---------------------------------------------------------
-elif menu == "⚙️ Pengaturan Struk & Printer":
-    st.header("⚙️ Custom Struk Penjualan")
+elif menu == "⚙️ Pengaturan System & Overhead":
+    st.header("⚙️ Pengaturan Sistem & Overhead")
+    
+    # 1. Edit Persentase Overhead
+    st.subheader("💡 1. Pengaturan Overhead Global")
+    c.execute("SELECT value FROM settings WHERE key='overhead_percent'")
+    res_ovh = c.fetchone()
+    current_ovh = float(res_ovh[0]) if res_ovh else 20.0
+    
+    new_ovh = st.number_input("Persentase Overhead Otomatis dari HPP Bahan Baku (%)", value=current_ovh, step=1.0, min_value=0.0)
+    
+    if st.button("💾 Simpan Persentase Overhead"):
+        c.execute("UPDATE settings SET value=? WHERE key='overhead_percent'", (str(new_ovh),))
+        conn.commit()
+        st.success(f"Persentase Overhead berhasil diperbarui menjadi {new_ovh}%!")
+        st.rerun()
+
+    st.markdown("---")
+    
+    # 2. Edit Custom Struk Penjualan
+    st.subheader("🧾 2. Custom Struk Penjualan")
     c.execute("SELECT value FROM settings WHERE key='receipt_header'")
     header_val = c.fetchone()[0]
     c.execute("SELECT value FROM settings WHERE key='receipt_footer'")
