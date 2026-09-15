@@ -1,3 +1,28 @@
+import streamlit as st
+import streamlit.components.v1 as components
+
+# Konfigurasi Tampilan Halaman Streamlit
+st.set_page_config(
+    page_title="KASIRKU - POS System",
+    page_icon="🛒",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# Menghilangkan padding default Streamlit agar tampilan HTML full screen
+st.markdown("""
+    <style>
+        .block-container {
+            padding: 0rem !important;
+            max-width: 100% !important;
+        }
+        header { visibility: hidden; }
+        footer { visibility: hidden; }
+    </style>
+""", unsafe_allow_html=True)
+
+# Kode HTML, CSS, dan JavaScript Aplikasi POS KASIRKU
+html_code = """
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -64,7 +89,7 @@
                         </button>
                     </div>
 
-                    <!-- LAPORAN (DITAMBAHKAN) -->
+                    <!-- LAPORAN -->
                     <div class="space-y-1">
                         <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider px-3 pt-2">Laporan</div>
                         <button onclick="switchTab('report-daily')" id="btn-report-daily" class="nav-btn w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-600 hover:bg-slate-100 transition">
@@ -380,7 +405,7 @@
                 </div>
             </section>
 
-            <!-- TAB 8: LAPORAN TRANSAKSI DETAIL (CASH / TF / EWALLET) -->
+            <!-- TAB 8: LAPORAN TRANSAKSI DETAIL -->
             <section id="tab-report-tx" class="tab-content hidden">
                 <div class="mb-6">
                     <h2 class="text-2xl font-bold text-slate-800">Laporan Transaksi Pembayaran</h2>
@@ -462,7 +487,7 @@
                 </div>
             </section>
 
-            <!-- TAB 10: LAPORAN PnL (LABA RUGI LENGKAP) -->
+            <!-- TAB 10: LAPORAN PnL -->
             <section id="tab-report-pnl" class="tab-content hidden">
                 <div class="mb-6">
                     <h2 class="text-2xl font-bold text-slate-800">Laporan PnL (Laba & Rugi Transparan)</h2>
@@ -597,7 +622,6 @@
         let selectedPayMethod = 'cash';
         let cart = [];
 
-        // DATA TRANSAKSI & PENGELUARAN
         let transactionsList = [];
         let expensesList = [];
 
@@ -644,7 +668,6 @@
             if (tabId === 'report-pnl') renderPnLReport();
         }
 
-        // POS FUNCTIONS
         function renderPosProducts(filter = "") {
             const grid = document.getElementById('pos-products-grid');
             grid.innerHTML = "";
@@ -781,7 +804,6 @@
             let txCogs = 0;
             let txOverhead = 0;
 
-            // Potong Stok Produk & hitung HPP modal produk terjual
             cart.forEach(item => {
                 const prod = products.find(p => p.id === item.id);
                 if (prod) {
@@ -808,7 +830,6 @@
                 }
             });
 
-            // Catat Riwayat Transaksi Laporan
             const today = new Date().toISOString().split('T')[0];
             const now = new Date().toLocaleTimeString('id-ID');
 
@@ -831,7 +852,6 @@
             renderPosProducts();
         }
 
-        // MASTER PRODUCT FUNCTIONS
         function renderProductTable() {
             const tbody = document.getElementById('product-table-body');
             tbody.innerHTML = products.map(p => `
@@ -914,7 +934,6 @@
             }
         }
 
-        // INPUT BAHAN BAKU FUNCTIONS
         function calcBahanGlobal() {
             const volume = parseFloat(document.getElementById('bahan-volume').value) || 0;
             const qty = parseFloat(document.getElementById('bahan-qty').value) || 0;
@@ -953,7 +972,6 @@
                 hargaGlobal: hargaGlobal
             });
 
-            // Catat otomatis ke Cashflow / Pengeluaran Kategori Bahan Baku
             const today = new Date().toISOString().split('T')[0];
             expensesList.push({
                 tanggal: today,
@@ -970,7 +988,6 @@
             calcBahanGlobal();
         }
 
-        // PEMBUATAN PRODUCT (RACIKAN & PRODUKSI)
         function initRacikanTab() {
             const select = document.getElementById('recipe-product-select');
             select.innerHTML = `<option value="">-- Pilih Produk --</option>` + products.map(p => `<option value="${p.id}">${p.nama}</option>`).join('');
@@ -1081,7 +1098,6 @@
             alert(`Berhasil memproduksi ${portion} porsi ${prod.nama}! Stok produk telah ditambahkan.`);
         }
 
-        // INVENTORY TABLES
         function renderStockProductTable() {
             const tbody = document.getElementById('stock-product-table-body');
             tbody.innerHTML = products.map(p => `
@@ -1111,7 +1127,6 @@
             }).join('');
         }
 
-        // 1. LAPORAN PENJUALAN HARIAN
         function renderDailyReport() {
             const tbody = document.getElementById('daily-report-table-body');
             const dailyData = {};
@@ -1141,7 +1156,6 @@
             `).join('');
         }
 
-        // 2. LAPORAN TRANSAKSI DETAIL METODE
         function renderTxReport() {
             const tbody = document.getElementById('tx-report-table-body');
 
@@ -1179,7 +1193,6 @@
             }).join('');
         }
 
-        // 3. LAPORAN CASHFLOW & PENGELUARAN
         function saveExpense() {
             const kategori = document.getElementById('expense-category').value;
             const keterangan = document.getElementById('expense-desc').value;
@@ -1216,9 +1229,7 @@
             `).join('');
         }
 
-        // 4. LAPORAN PnL (LABA RUGI COMPREHENSIVE)
         function renderPnLReport() {
-            // A. Stock Value Calculation
             let rawMaterialValue = 0;
             bahanBakuList.forEach(b => {
                 rawMaterialValue += (b.sisaStok * b.hargaGlobal);
@@ -1239,7 +1250,6 @@
 
             const totalAssetStock = rawMaterialValue + unsoldProductValue;
 
-            // B. Omset & Sales Profit
             let totalOmset = 0;
             let totalCogs = 0;
             let totalOverhead = 0;
@@ -1252,7 +1262,6 @@
 
             const grossProfit = totalOmset - totalCogs - totalOverhead;
 
-            // C. Expenses Breakdown
             let expBahan = 0, expOps = 0, expAsset = 0;
             expensesList.forEach(e => {
                 if (e.kategori === 'Bahan Baku') expBahan += e.nominal;
@@ -1262,7 +1271,6 @@
 
             const netProfit = grossProfit - expOps - expAsset;
 
-            // DOM Updates
             document.getElementById('pnl-raw-value').innerText = 'Rp ' + Math.round(rawMaterialValue).toLocaleString('id-ID');
             document.getElementById('pnl-unsold-product-value').innerText = 'Rp ' + Math.round(unsoldProductValue).toLocaleString('id-ID');
             document.getElementById('pnl-total-asset-value').innerText = 'Rp ' + Math.round(totalAssetStock).toLocaleString('id-ID');
@@ -1279,14 +1287,12 @@
             document.getElementById('pnl-net-profit').innerText = 'Rp ' + Math.round(netProfit).toLocaleString('id-ID');
         }
 
-        // PENGATURAN
         function saveSettings() {
             overheadRate = parseFloat(document.getElementById('set-overhead-rate').value) || 0;
             ppnRate = parseFloat(document.getElementById('set-ppn-rate').value) || 0;
             alert("Pengaturan Overhead & PPN berhasil disimpan!");
         }
 
-        // INITIALIZATION
         document.addEventListener("DOMContentLoaded", function() {
             lucide.createIcons();
             renderPosProducts();
@@ -1294,3 +1300,7 @@
     </script>
 </body>
 </html>
+"""
+
+# Menampilkan aplikasi web HTML di dalam Streamlit
+components.html(html_code, height=900, scrolling=True)
