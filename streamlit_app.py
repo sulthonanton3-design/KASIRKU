@@ -117,17 +117,24 @@ if menu == "🛒 Kasir (POS)":
                         if row['image'] and os.path.exists(row['image']):
                             st.image(row['image'], use_column_width=True)
                         else:
-                            st.write("🖼️ *Tanpa Gambar*")
-                        st.markdown(f"**{row['name']}**")
-                        st.markdown(f"<h5 style='color: #1E88E5; margin:0;'>Rp {row['price']:,.0f}</h5>", unsafe_allow_html=True)
-                        # Kode baru yang aman:
-stock_val = row.get('stock', 0)
-st.caption(f"Stok: {stock_val}")
-                        
-                        if st.button(f"➕ Tambah", key=f"btn_add_{row['id']}", use_container_width=True):
-                            st.session_state['cart'].append({"id": row['id'], "name": row['name'], "price": row['price']})
-                            st.rerun()
-
+cols = st.columns(4)
+for idx, row in products.reset_index(drop=True).iterrows():
+    with cols[idx % 4]:
+        with st.container(border=True):
+            if row['image'] and os.path.exists(row['image']):
+                st.image(row['image'], use_column_width=True)
+            else:
+                st.write("🖼️ *Tanpa Gambar*")
+            st.markdown(f"**{row['name']}**")
+            st.markdown(f"<h5 style='color: #1E88E5; margin:0;'>Rp {row['price']:,.0f}</h5>", unsafe_allow_html=True)
+            
+            # Aman dari error KeyError & IndentationError
+            stock_val = row.get('stock', 0)
+            st.caption(f"Stok: {stock_val}")
+            
+            if st.button(f"➕ Tambah", key=f"btn_add_{row['id']}", use_container_width=True):
+                st.session_state['cart'].append({"id": row['id'], "name": row['name'], "price": row['price']})
+                st.rerun()
     with col_cart:
         with st.container(border=True):
             st.markdown("### 🛒 Keranjang")
