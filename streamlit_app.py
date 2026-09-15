@@ -20,6 +20,7 @@ st.markdown("""
         footer { visibility: hidden; }
     </style>
 """, unsafe_allow_html=True)
+
 html_content = """<!DOCTYPE html>
 <html lang="id">
 <head>
