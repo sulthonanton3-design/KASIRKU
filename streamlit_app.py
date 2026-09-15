@@ -190,83 +190,123 @@ if menu == "🛒 Kasir (POS)":
                 st.info("Keranjang kosong. Klik produk di sebelah kiri untuk menambahkan.")
 
 # ---------------------------------------------------------
-# MENU 2: KELOLA & EDIT PRODUK
+# MENU: PRODUK (DESAIN MODERN KANBAN / LIST TABEL)
 # ---------------------------------------------------------
 elif menu == "📝 Kelola & Edit Produk":
-    st.header("📝 Daftar & Adjustment Produk")
-    st.caption("Gunakan menu ini untuk mengubah nama, harga, stok, atau menghapus produk yang terinput.")
-    
-    df_products = pd.read_sql("SELECT * FROM products", conn)
-    
-    if not df_products.empty:
-        df_display = df_products.copy()
-        df_display['price_fmt'] = df_display['price'].apply(lambda x: f"Rp {x:,.0f}")
-        df_display['hpp_fmt'] = df_display['hpp'].apply(lambda x: f"Rp {x:,.2f}" if pd.notnull(x) else "Rp 0")
-        if 'stock' not in df_display.columns:
-            df_display['stock'] = 100
-        
-        st.subheader("📋 Daftar Produk Saat Ini")
-        st.dataframe(
-            df_display[['id', 'name', 'price_fmt', 'hpp_fmt', 'stock', 'image']],
-            column_config={
-                "id": "ID",
-                "name": "Nama Produk",
-                "price_fmt": "Harga Jual",
-                "hpp_fmt": "HPP",
-                "stock": "Stok Produk",
-                "image": "Gambar Path"
-            },
-            hide_index=True,
-            use_container_width=True
-        )
-        
-        st.markdown("---")
-        st.subheader("⚙️ Adjust / Edit / Hapus Produk")
-        selected_prod_id = st.selectbox(
-            "Pilih Produk yang Ingin Diubah",
-            df_products['id'].tolist(),
-            format_func=lambda x: df_products[df_products['id'] == x]['name'].values[0]
-        )
-        
-        prod_data = df_products[df_products['id'] == selected_prod_id].iloc[0]
-        
-        col_ed1, col_ed2 = st.columns(2)
-        with col_ed1:
-            edit_name = st.text_input("Nama Produk", value=prod_data['name'])
-            edit_price = st.number_input("Harga Jual (Rp)", value=float(prod_data['price']), step=1000.0)
-            edit_hpp = st.number_input("HPP Produk (Rp)", value=float(prod_data['hpp']) if pd.notnull(prod_data['hpp']) else 0.0, step=500.0)
-        with col_ed2:
-            current_stock = float(prod_data['stock']) if 'stock' in prod_data and pd.notnull(prod_data['stock']) else 100.0
-            edit_stock = st.number_input("Jumlah Stok", value=current_stock, step=1.0)
-            edit_img = st.file_uploader("Ganti Foto Produk (Opsional)", type=["jpg", "png", "jpeg"])
-            if prod_data['image'] and os.path.exists(prod_data['image']):
-                st.image(prod_data['image'], width=100, caption="Foto Saat Ini")
-        
-        col_act1, col_act2 = st.columns(2)
-        with col_act1:
-            if st.button("💾 Simpan Perubahan Produk", type="primary", use_container_width=True):
-                img_path = save_uploaded_file(edit_img) if edit_img is not None else prod_data['image']
-                
-                try:
-                    c.execute("UPDATE products SET name=?, price=?, hpp=?, stock=?, image=? WHERE id=?",
-                              (edit_name, edit_price, edit_hpp, edit_stock, img_path, selected_prod_id))
-                except:
-                    c.execute("UPDATE products SET name=?, price=?, hpp=?, image=? WHERE id=?",
-                              (edit_name, edit_price, edit_hpp, img_path, selected_prod_id))
-                    
-                conn.commit()
-                st.success(f"Produk '{edit_name}' berhasil diperbarui!")
-                st.rerun()
-        with col_act2:
-            if st.button("🗑️ Hapus Produk Ini", use_container_width=True):
-                c.execute("DELETE FROM products WHERE id=?", (selected_prod_id,))
-                c.execute("DELETE FROM recipes WHERE product_id=?", (selected_prod_id,))
-                conn.commit()
-                st.warning("Produk dan resep terkait berhasil dihapus!")
-                st.rerun()
-    else:
-        st.info("Belum ada produk terdaftar.")
+    # 1. Header & Action Buttons Utama
+    col_hdr1, col_hdr2 = st.columns([3, 2])
+    with col_hdr1:
+        st.title("Produk")
+        st.caption("Kelola produk, barcode, harga jual & HPP")
+    with col_hdr2:
+        st.write("") # Spacer
+        btn_col1, btn_col2, btn_col3 = st.columns([1, 1.5, 1.5])
+        with btn_col1:
+            st.button("⬇️ CSV", use_container_width=True)
+        with btn_col2:
+            st.button("⚡ + Tambah Massal", use_container_width=True)
+        with btn_col3:
+            if st.button("➕ Tambah Produk", type="primary", use_container_width=True):
+                st.session_state['show_add_modal'] = True
 
+    st.markdown("---")
+
+    # 2. Filter Bar (Pencarian & Dropdown Filter)
+    f_col1, f_col2, f_col3, f_col4 = st.columns([4, 2, 2, 0.5])
+    with f_col1:
+        search_kw = st.text_input("Cari", placeholder="🔍 Cari nama, SKU, barcode...", label_visibility="collapsed")
+    with f_col2:
+        cat_filter = st.selectbox("Kategori", ["Semua Kategori", "Aksesoris", "Rumah Tangga", "Peralatan Olahraga"], label_visibility="collapsed")
+    with f_col3:
+        status_filter = st.selectbox("Status", ["Semua Status", "Aktif", "Non-Aktif"], label_visibility="collapsed")
+    with f_col4:
+        st.button("🔄", help="Reset Filter", use_container_width=True)
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # 3. Fetch Data Produk dari Database
+    df_products = pd.read_sql("SELECT * FROM products", conn)
+
+    if df_products.empty:
+        st.info("Belum ada data produk terdaftar.")
+    else:
+        # Terapkan filter jika user melakukan pencarian
+        if search_kw:
+            df_products = df_products[
+                df_products['name'].str.contains(search_kw, case=False, na=False) |
+                df_products.get('sku', pd.Series(['']*len(df_products))).str.contains(search_kw, case=False, na=False)
+            ]
+
+        # Header Tabel Kustom
+        h1, h2, h3, h4, h5, h6, h7, h8, h9 = st.columns([0.8, 1.5, 2.5, 1.8, 1.5, 1.5, 1.0, 1.0, 1.2])
+        with h1: st.caption("**GAMBAR**")
+        with h2: st.caption("**SKU/BARCODE**")
+        with h3: st.caption("**NAMA**")
+        with h4: st.caption("**KATEGORI**")
+        with h5: st.caption("**HARGA**")
+        with h6: st.caption("**HPP**")
+        with h7: st.caption("**STOK**")
+        with h8: st.caption("**STATUS**")
+        with h9: st.caption("**AKSI**")
+
+        st.divider()
+
+        # Render Baris Produk
+        for idx, row in df_products.iterrows():
+            c1, c2, c3, c4, c5, c6, c7, c8, c9 = st.columns([0.8, 1.5, 2.5, 1.8, 1.5, 1.5, 1.0, 1.0, 1.2])
+            
+            # 1. Gambar
+            with c1:
+                if row['image'] and os.path.exists(row['image']):
+                    st.image(row['image'], width=45)
+                else:
+                    st.markdown("🖼️")
+
+            # 2. SKU / Barcode
+            with c2:
+                sku_val = row.get('sku', f"DPT-{row['id']:06d}")
+                st.caption(f"`{sku_val}`")
+
+            # 3. Nama Produk
+            with c3:
+                st.markdown(f"**{row['name']}**")
+
+            # 4. Kategori
+            with c4:
+                cat_val = row.get('category', 'Aksesoris')
+                st.write(cat_val)
+
+            # 5. Harga Jual
+            with c5:
+                st.markdown(f"**Rp {row['price']:,.0f}**")
+
+            # 6. HPP
+            with c6:
+                hpp_val = row['hpp'] if pd.notnull(row['hpp']) else 0
+                st.caption(f"Rp {hpp_val:,.0f} ⚙️")
+
+            # 7. Stok
+            with c7:
+                st_val = row.get('stock', 0)
+                st.write(f"{st_val:g} pcs")
+
+            # 8. Status (Badge)
+            with c8:
+                st.markdown("<span style='background-color:#D4EDDA; color:#155724; padding:3px 8px; border-radius:12px; font-size:12px; font-weight:bold;'>Aktif</span>", unsafe_allow_html=True)
+
+            # 9. Tombol Edit & Delete
+            with c9:
+                act_col1, act_col2 = st.columns(2)
+                with act_col1:
+                    if st.button("Edit", key=f"edt_{row['id']}", type="secondary"):
+                        st.session_state['edit_product_id'] = row['id']
+                with act_col2:
+                    if st.button("❌", key=f"del_{row['id']}"):
+                        c.execute("DELETE FROM products WHERE id=?", (row['id'],))
+                        conn.commit()
+                        st.rerun()
+
+            st.markdown("<hr style='margin: 4px 0; border: 0.5px solid #f0f2f6;'>", unsafe_allow_html=True)
 # ---------------------------------------------------------
 # MENU 3: INPUT & STOK BAHAN BAKU
 # ---------------------------------------------------------
