@@ -340,7 +340,7 @@ html_code = """
             <section id="tab-stock-product" class="tab-content hidden">
                 <div class="mb-6">
                     <h2 class="text-2xl font-bold text-slate-800">Stock Product (Siap Jual)</h2>
-                    <p class="text-sm text-slate-500">Produk yang telah melalui proses pembuatan dan siap dijual melalui POS.</p>
+                    <p class="text-sm text-slate-500">Produk yang telah melalui proses pembuatan dan siap dijual melalui POS. Anda dapat mengedit stok atau menghapus data produk di sini.</p>
                 </div>
 
                 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -352,6 +352,7 @@ html_code = """
                                 <th class="p-4">Stok Tersedia</th>
                                 <th class="p-4">Harga Jual</th>
                                 <th class="p-4">Status POS</th>
+                                <th class="p-4 text-right">Aksi Inventory</th>
                             </tr>
                         </thead>
                         <tbody id="stock-product-table-body" class="divide-y text-sm"></tbody>
@@ -362,8 +363,8 @@ html_code = """
             <!-- TAB 6: INVENTORY - AKUMULASI STOCK BAHAN -->
             <section id="tab-stock-bahan" class="tab-content hidden">
                 <div class="mb-6">
-                    <h2 class="text-2xl font-bold text-slate-800">Akumulasi Stock Bahan</h2>
-                    <p class="text-sm text-slate-500">Total belanja bahan baku yang berkurang secara otomatis ketika pesanan diproses di Kasir.</p>
+                    <h2 class="text-2xl font-bold text-slate-800">Akumulasi Stock Bahan Baku</h2>
+                    <p class="text-sm text-slate-500">Kelola stok bahan mentah. Anda dapat mengedit sisa stok atau menghapus bahan baku dari sistem.</p>
                 </div>
 
                 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
@@ -373,8 +374,9 @@ html_code = """
                                 <th class="p-4">Nama Bahan</th>
                                 <th class="p-4">Total Awal Belanja</th>
                                 <th class="p-4">Sisa Stok Bahan</th>
-                                <th class="p-4">Satuan</th>
-                                <th class="p-4">Total Value Nilai Bahan</th>
+                                <th class="p-4">Harga Global / Satuan</th>
+                                <th class="p-4">Total Value Stok</th>
+                                <th class="p-4 text-right">Aksi Inventory</th>
                             </tr>
                         </thead>
                         <tbody id="stock-bahan-table-body" class="divide-y text-sm"></tbody>
@@ -384,12 +386,28 @@ html_code = """
 
             <!-- TAB 7: LAPORAN PENJUALAN HARIAN -->
             <section id="tab-report-daily" class="tab-content hidden">
-                <div class="flex justify-between items-center mb-6">
-                    <div>
-                        <h2 class="text-2xl font-bold text-slate-800">Laporan Penjualan Harian</h2>
-                        <p class="text-sm text-slate-500">Ringkasan transaksi berdasarkan tanggal.</p>
-                    </div>
+                <div class="mb-6">
+                    <h2 class="text-2xl font-bold text-slate-800">Laporan Penjualan Harian</h2>
+                    <p class="text-sm text-slate-500">Ringkasan transaksi berdasarkan tanggal dengan opsi filter fleksibel.</p>
                 </div>
+
+                <!-- COMPONENT FILTER HARIAN -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 mb-6 shadow-sm flex flex-wrap gap-4 items-end">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Dari Tanggal</label>
+                        <input type="date" id="filter-daily-start" onchange="renderDailyReport()" class="border rounded-lg p-2 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Sampai Tanggal</label>
+                        <input type="date" id="filter-daily-end" onchange="renderDailyReport()" class="border rounded-lg p-2 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Bulan & Tahun</label>
+                        <input type="month" id="filter-daily-month" onchange="renderDailyReport()" class="border rounded-lg p-2 text-xs">
+                    </div>
+                    <button onclick="resetDailyFilters()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg text-xs font-semibold">Reset Filter</button>
+                </div>
+
                 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                     <table class="w-full text-left border-collapse">
                         <thead class="bg-slate-50 border-b text-xs font-semibold text-slate-500 uppercase">
@@ -411,6 +429,33 @@ html_code = """
                     <h2 class="text-2xl font-bold text-slate-800">Laporan Transaksi Pembayaran</h2>
                     <p class="text-sm text-slate-500">Rincian metode pembayaran Cash, Transfer, dan E-Wallet.</p>
                 </div>
+
+                <!-- COMPONENT FILTER TRANSAKSI -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 mb-6 shadow-sm flex flex-wrap gap-4 items-end">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Dari Tanggal</label>
+                        <input type="date" id="filter-tx-start" onchange="renderTxReport()" class="border rounded-lg p-2 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Sampai Tanggal</label>
+                        <input type="date" id="filter-tx-end" onchange="renderTxReport()" class="border rounded-lg p-2 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Bulan & Tahun</label>
+                        <input type="month" id="filter-tx-month" onchange="renderTxReport()" class="border rounded-lg p-2 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Jenis / Metode Bayar</label>
+                        <select id="filter-tx-method" onchange="renderTxReport()" class="border rounded-lg p-2 text-xs">
+                            <option value="all">Semua Metode</option>
+                            <option value="cash">Cash</option>
+                            <option value="transfer">Transfer</option>
+                            <option value="ewallet">E-Wallet</option>
+                        </select>
+                    </div>
+                    <button onclick="resetTxFilters()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg text-xs font-semibold">Reset Filter</button>
+                </div>
+
                 <div class="grid grid-cols-3 gap-4 mb-6">
                     <div class="bg-white p-4 rounded-xl border shadow-sm">
                         <p class="text-xs text-slate-400 font-semibold">TOTAL CASH</p>
@@ -425,6 +470,7 @@ html_code = """
                         <p id="tx-total-ewallet" class="text-xl font-bold text-purple-600 mt-1">Rp 0</p>
                     </div>
                 </div>
+
                 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
                     <table class="w-full text-left border-collapse">
                         <thead class="bg-slate-50 border-b text-xs font-semibold text-slate-500 uppercase">
@@ -452,6 +498,10 @@ html_code = """
                     <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm space-y-4">
                         <h3 class="font-bold border-b pb-2 text-slate-800">Input Pengeluaran Baru</h3>
                         <div>
+                            <label class="block text-xs font-semibold mb-1">Tanggal Pengeluaran</label>
+                            <input type="date" id="expense-date" class="w-full border rounded-lg p-2 text-sm">
+                        </div>
+                        <div>
                             <label class="block text-xs font-semibold mb-1">Kategori Pengeluaran</label>
                             <select id="expense-category" class="w-full border rounded-lg p-2 text-sm">
                                 <option value="Bahan Baku">Belanja Bahan Baku</option>
@@ -470,19 +520,50 @@ html_code = """
                         <button onclick="saveExpense()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg text-sm transition">Simpan Pengeluaran</button>
                     </div>
 
-                    <div class="col-span-2 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
-                        <div class="p-4 border-b font-bold text-slate-800">Riwayat Pengeluaran (Arus Kas Keluar)</div>
-                        <table class="w-full text-left border-collapse">
-                            <thead class="bg-slate-50 border-b text-xs font-semibold text-slate-500 uppercase">
-                                <tr>
-                                    <th class="p-3">Tanggal</th>
-                                    <th class="p-3">Kategori</th>
-                                    <th class="p-3">Keterangan</th>
-                                    <th class="p-3 text-right">Nominal</th>
-                                </tr>
-                            </thead>
-                            <tbody id="expense-table-body" class="divide-y text-sm"></tbody>
-                        </table>
+                    <div class="col-span-2 space-y-4">
+                        <!-- COMPONENT FILTER CASHFLOW -->
+                        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-wrap gap-3 items-end">
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Dari Tanggal</label>
+                                <input type="date" id="filter-exp-start" onchange="renderExpenseTable()" class="border rounded-lg p-2 text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Sampai Tanggal</label>
+                                <input type="date" id="filter-exp-end" onchange="renderExpenseTable()" class="border rounded-lg p-2 text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Bulan & Tahun</label>
+                                <input type="month" id="filter-exp-month" onchange="renderExpenseTable()" class="border rounded-lg p-2 text-xs">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-semibold text-slate-600 mb-1">Jenis Kategori</label>
+                                <select id="filter-exp-cat" onchange="renderExpenseTable()" class="border rounded-lg p-2 text-xs">
+                                    <option value="all">Semua Kategori</option>
+                                    <option value="Bahan Baku">Bahan Baku</option>
+                                    <option value="Operasional">Operasional</option>
+                                    <option value="Asset">Asset</option>
+                                </select>
+                            </div>
+                            <button onclick="resetExpFilters()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg text-xs font-semibold">Reset</button>
+                        </div>
+
+                        <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                            <div class="p-4 border-b font-bold text-slate-800 flex justify-between items-center">
+                                <span>Riwayat Pengeluaran (Arus Kas Keluar)</span>
+                                <span id="exp-filtered-total" class="text-xs bg-red-50 text-red-600 px-2.5 py-1 rounded-full border border-red-200">Total: Rp 0</span>
+                            </div>
+                            <table class="w-full text-left border-collapse">
+                                <thead class="bg-slate-50 border-b text-xs font-semibold text-slate-500 uppercase">
+                                    <tr>
+                                        <th class="p-3">Tanggal</th>
+                                        <th class="p-3">Kategori</th>
+                                        <th class="p-3">Keterangan</th>
+                                        <th class="p-3 text-right">Nominal</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="expense-table-body" class="divide-y text-sm"></tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -492,6 +573,23 @@ html_code = """
                 <div class="mb-6">
                     <h2 class="text-2xl font-bold text-slate-800">Laporan PnL (Laba & Rugi Transparan)</h2>
                     <p class="text-sm text-slate-500">Evaluasi total aset, modal terpakai, biaya operasional, dan laba bersih usaha.</p>
+                </div>
+
+                <!-- COMPONENT FILTER PnL -->
+                <div class="bg-white p-4 rounded-xl border border-slate-200 mb-6 shadow-sm flex flex-wrap gap-4 items-end">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Dari Tanggal</label>
+                        <input type="date" id="filter-pnl-start" onchange="renderPnLReport()" class="border rounded-lg p-2 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Sampai Tanggal</label>
+                        <input type="date" id="filter-pnl-end" onchange="renderPnLReport()" class="border rounded-lg p-2 text-xs">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Bulan & Tahun</label>
+                        <input type="month" id="filter-pnl-month" onchange="renderPnLReport()" class="border rounded-lg p-2 text-xs">
+                    </div>
+                    <button onclick="resetPnLFilters()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 px-3 py-2 rounded-lg text-xs font-semibold">Reset Filter</button>
                 </div>
 
                 <div class="grid grid-cols-2 gap-6">
@@ -599,6 +697,10 @@ html_code = """
                 <input type="number" id="modal-harga" class="w-full border rounded p-2 text-sm">
             </div>
             <div>
+                <label class="block text-xs font-semibold mb-1">Stok Siap Jual</label>
+                <input type="number" id="modal-stok" class="w-full border rounded p-2 text-sm">
+            </div>
+            <div>
                 <label class="block text-xs font-semibold mb-1">URL Gambar Produk</label>
                 <input type="text" id="modal-gambar" placeholder="https://..." class="w-full border rounded p-2 text-sm">
             </div>
@@ -616,14 +718,66 @@ html_code = """
         </div>
     </div>
 
+    <!-- MODAL EDIT INVENTORY STOK BAHAN BAKU -->
+    <div id="bahan-modal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
+        <div class="bg-white w-full max-w-md p-6 rounded-xl shadow-lg space-y-4">
+            <h3 class="text-lg font-bold border-b pb-2">Edit Inventory Bahan Baku</h3>
+            <input type="hidden" id="modal-bahan-id">
+            <div>
+                <label class="block text-xs font-semibold mb-1">Nama Bahan Baku</label>
+                <input type="text" id="modal-bahan-nama" class="w-full border rounded p-2 text-sm">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold mb-1">Satuan</label>
+                    <input type="text" id="modal-bahan-satuan" class="w-full border rounded p-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold mb-1">Harga Global/Satuan (Rp)</label>
+                    <input type="number" id="modal-bahan-harga" class="w-full border rounded p-2 text-sm">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-semibold mb-1">Total Awal Belanja</label>
+                    <input type="number" id="modal-bahan-totalstok" class="w-full border rounded p-2 text-sm">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold mb-1">Sisa Stok Sekarang</label>
+                    <input type="number" id="modal-bahan-sisastok" class="w-full border rounded p-2 text-sm">
+                </div>
+            </div>
+            <div class="flex justify-end gap-2 pt-2 border-t">
+                <button onclick="closeBahanModal()" class="px-4 py-2 bg-slate-200 text-xs font-semibold rounded-lg">Batal</button>
+                <button onclick="saveBahanEditForm()" class="px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg">Simpan Stok Bahan</button>
+            </div>
+        </div>
+    </div>
+
     <script>
         let overheadRate = 10;
         let ppnRate = 11;
         let selectedPayMethod = 'cash';
         let cart = [];
 
-        let transactionsList = [];
-        let expensesList = [];
+        let transactionsList = [
+            {
+                id: 'TRX-1700000000000',
+                tanggal: '2026-03-15',
+                waktu: '10:30:00',
+                items: [{ id: 1, nama: 'Kopi Susu Gula Aren', harga: 18000, qty: 2 }],
+                metode: 'cash',
+                subtotal: 36000,
+                ppn: 3960,
+                total: 39960,
+                cogs: 6600,
+                overhead: 660
+            }
+        ];
+
+        let expensesList = [
+            { tanggal: '2026-03-15', kategori: 'Bahan Baku', keterangan: 'Beli Biji Kopi Arabika (2 pack)', nominal: 300000 }
+        ];
 
         let products = [
             { id: 1, nama: 'Kopi Susu Gula Aren', kategori: 'Minuman', harga: 18000, stok: 25, status: 'Ready', gambar: 'https://images.unsplash.com/photo-1541167760496-1628856ab772?w=300' },
@@ -664,10 +818,14 @@ html_code = """
             if (tabId === 'stock-bahan') renderStockBahanTable();
             if (tabId === 'report-daily') renderDailyReport();
             if (tabId === 'report-tx') renderTxReport();
-            if (tabId === 'report-cashflow') renderExpenseTable();
+            if (tabId === 'report-cashflow') {
+                document.getElementById('expense-date').value = new Date().toISOString().split('T')[0];
+                renderExpenseTable();
+            }
             if (tabId === 'report-pnl') renderPnLReport();
         }
 
+        // --- POS FUNCTIONS ---
         function renderPosProducts(filter = "") {
             const grid = document.getElementById('pos-products-grid');
             grid.innerHTML = "";
@@ -852,6 +1010,7 @@ html_code = """
             renderPosProducts();
         }
 
+        // --- MASTER PRODUCT & INVENTORY MANAGEMENT ---
         function renderProductTable() {
             const tbody = document.getElementById('product-table-body');
             tbody.innerHTML = products.map(p => `
@@ -860,7 +1019,7 @@ html_code = """
                     <td class="p-4 font-semibold text-slate-800">${p.nama}</td>
                     <td class="p-4 text-slate-500">${p.kategori}</td>
                     <td class="p-4 font-medium text-slate-700">Rp ${p.harga.toLocaleString('id-ID')}</td>
-                    <td class="p-4"><span class="text-xs px-2.5 py-1 rounded-full font-semibold ${p.status === 'Ready' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">${p.status}</span></td>
+                    <td class="p-4"><span class="text-xs px-2.5 py-1 rounded-full font-semibold ${p.status === 'Ready' && p.stok > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">${p.status === 'Ready' && p.stok > 0 ? 'Ready (' + p.stok + ')' : 'Habis'}</span></td>
                     <td class="p-4 text-right">
                         <button onclick="openProductModal(${p.id})" class="text-blue-600 hover:underline text-xs font-semibold mr-2">Edit</button>
                         <button onclick="deleteProduct(${p.id})" class="text-red-600 hover:underline text-xs font-semibold">Hapus</button>
@@ -876,11 +1035,12 @@ html_code = """
 
             if (productId) {
                 const p = products.find(item => item.id === productId);
-                document.getElementById('modal-title').innerText = "Edit Produk";
+                document.getElementById('modal-title').innerText = "Edit Produk & Stok";
                 document.getElementById('modal-product-id').value = p.id;
                 document.getElementById('modal-nama').value = p.nama;
                 document.getElementById('modal-kategori').value = p.kategori;
                 document.getElementById('modal-harga').value = p.harga;
+                document.getElementById('modal-stok').value = p.stok;
                 document.getElementById('modal-gambar').value = p.gambar;
                 document.getElementById('modal-status').value = p.status;
             } else {
@@ -888,6 +1048,7 @@ html_code = """
                 document.getElementById('modal-product-id').value = "";
                 document.getElementById('modal-nama').value = "";
                 document.getElementById('modal-harga').value = "";
+                document.getElementById('modal-stok').value = 0;
                 document.getElementById('modal-gambar').value = "";
                 document.getElementById('modal-status').value = "Ready";
             }
@@ -904,36 +1065,59 @@ html_code = """
             const nama = document.getElementById('modal-nama').value;
             const kategori = document.getElementById('modal-kategori').value;
             const harga = parseFloat(document.getElementById('modal-harga').value) || 0;
+            const stok = parseInt(document.getElementById('modal-stok').value) || 0;
             const gambar = document.getElementById('modal-gambar').value;
-            const status = document.getElementById('modal-status').value;
+            let status = document.getElementById('modal-status').value;
 
             if (!nama || harga <= 0) {
                 alert("Harap isi nama dan harga produk dengan benar!");
                 return;
             }
 
+            if (stok <= 0) status = 'Habis';
+
             if (id) {
                 const p = products.find(item => item.id == id);
                 if (p) {
-                    p.nama = nama; p.kategori = kategori; p.harga = harga; p.gambar = gambar; p.status = status;
+                    p.nama = nama; p.kategori = kategori; p.harga = harga; p.stok = stok; p.gambar = gambar; p.status = status;
                 }
             } else {
                 const newId = products.length ? Math.max(...products.map(p => p.id)) + 1 : 1;
-                products.push({ id: newId, nama, kategori, harga, stok: 0, status, gambar });
+                products.push({ id: newId, nama, kategori, harga, stok, status, gambar });
             }
 
             closeProductModal();
             renderProductTable();
+            renderStockProductTable();
         }
 
         function deleteProduct(productId) {
-            if (confirm("Apakah Anda yakin ingin menghapus produk ini?")) {
+            if (confirm("Apakah Anda yakin ingin menghapus produk ini dari inventory?")) {
                 products = products.filter(p => p.id !== productId);
                 recipesList = recipesList.filter(r => r.productId !== productId);
                 renderProductTable();
+                renderStockProductTable();
             }
         }
 
+        function renderStockProductTable() {
+            const tbody = document.getElementById('stock-product-table-body');
+            tbody.innerHTML = products.map(p => `
+                <tr class="hover:bg-slate-50">
+                    <td class="p-4 font-semibold text-slate-800">${p.nama}</td>
+                    <td class="p-4 text-slate-500">${p.kategori}</td>
+                    <td class="p-4 font-bold text-blue-600">${p.stok} Porsi</td>
+                    <td class="p-4 text-slate-700">Rp ${p.harga.toLocaleString('id-ID')}</td>
+                    <td class="p-4"><span class="text-xs px-2.5 py-1 rounded-full font-semibold ${p.status === 'Ready' && p.stok > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">${p.status === 'Ready' && p.stok > 0 ? 'Tersedia' : 'Habis / Non-aktif'}</span></td>
+                    <td class="p-4 text-right">
+                        <button onclick="openProductModal(${p.id})" class="text-blue-600 hover:underline text-xs font-semibold mr-2">Edit Stok</button>
+                        <button onclick="deleteProduct(${p.id})" class="text-red-600 hover:underline text-xs font-semibold">Hapus</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // --- BAHAN BAKU INVENTORY MANAGEMENT ---
         function calcBahanGlobal() {
             const volume = parseFloat(document.getElementById('bahan-volume').value) || 0;
             const qty = parseFloat(document.getElementById('bahan-qty').value) || 0;
@@ -988,6 +1172,76 @@ html_code = """
             calcBahanGlobal();
         }
 
+        function renderStockBahanTable() {
+            const tbody = document.getElementById('stock-bahan-table-body');
+            tbody.innerHTML = bahanBakuList.map(b => {
+                const totalValue = b.sisaStok * b.hargaGlobal;
+                return `
+                    <tr class="hover:bg-slate-50">
+                        <td class="p-4 font-semibold text-slate-800">${b.nama}</td>
+                        <td class="p-4 text-slate-500">${b.totalStok.toLocaleString('id-ID')} ${b.satuan}</td>
+                        <td class="p-4 font-bold ${b.sisaStok < (b.totalStok * 0.2) ? 'text-red-600' : 'text-emerald-600'}">${b.sisaStok.toLocaleString('id-ID')} ${b.satuan}</td>
+                        <td class="p-4 text-slate-600 text-xs">Rp ${Math.round(b.hargaGlobal).toLocaleString('id-ID')} / ${b.satuan}</td>
+                        <td class="p-4 font-semibold text-slate-700">Rp ${Math.round(totalValue).toLocaleString('id-ID')}</td>
+                        <td class="p-4 text-right">
+                            <button onclick="openBahanModal(${b.id})" class="text-blue-600 hover:underline text-xs font-semibold mr-2">Edit</button>
+                            <button onclick="deleteBahanBaku(${b.id})" class="text-red-600 hover:underline text-xs font-semibold">Hapus</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function openBahanModal(id) {
+            const b = bahanBakuList.find(item => item.id === id);
+            if (!b) return;
+            document.getElementById('modal-bahan-id').value = b.id;
+            document.getElementById('modal-bahan-nama').value = b.nama;
+            document.getElementById('modal-bahan-satuan').value = b.satuan;
+            document.getElementById('modal-bahan-harga').value = Math.round(b.hargaGlobal);
+            document.getElementById('modal-bahan-totalstok').value = b.totalStok;
+            document.getElementById('modal-bahan-sisastok').value = b.sisaStok;
+
+            const modal = document.getElementById('bahan-modal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeBahanModal() {
+            const modal = document.getElementById('bahan-modal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        function saveBahanEditForm() {
+            const id = parseInt(document.getElementById('modal-bahan-id').value);
+            const nama = document.getElementById('modal-bahan-nama').value;
+            const satuan = document.getElementById('modal-bahan-satuan').value;
+            const hargaGlobal = parseFloat(document.getElementById('modal-bahan-harga').value) || 0;
+            const totalStok = parseFloat(document.getElementById('modal-bahan-totalstok').value) || 0;
+            const sisaStok = parseFloat(document.getElementById('modal-bahan-sisastok').value) || 0;
+
+            const b = bahanBakuList.find(item => item.id === id);
+            if (b) {
+                b.nama = nama;
+                b.satuan = satuan;
+                b.hargaGlobal = hargaGlobal;
+                b.totalStok = totalStok;
+                b.sisaStok = sisaStok;
+            }
+
+            closeBahanModal();
+            renderStockBahanTable();
+        }
+
+        function deleteBahanBaku(id) {
+            if (confirm("Apakah Anda yakin ingin menghapus bahan baku ini dari inventory?")) {
+                bahanBakuList = bahanBakuList.filter(b => b.id !== id);
+                renderStockBahanTable();
+            }
+        }
+
+        // --- RACIKAN / RESEP PRODUK ---
         function initRacikanTab() {
             const select = document.getElementById('recipe-product-select');
             select.innerHTML = `<option value="">-- Pilih Produk --</option>` + products.map(p => `<option value="${p.id}">${p.nama}</option>`).join('');
@@ -1098,51 +1352,37 @@ html_code = """
             alert(`Berhasil memproduksi ${portion} porsi ${prod.nama}! Stok produk telah ditambahkan.`);
         }
 
-        function renderStockProductTable() {
-            const tbody = document.getElementById('stock-product-table-body');
-            tbody.innerHTML = products.map(p => `
-                <tr class="hover:bg-slate-50">
-                    <td class="p-4 font-semibold text-slate-800">${p.nama}</td>
-                    <td class="p-4 text-slate-500">${p.kategori}</td>
-                    <td class="p-4 font-bold text-blue-600">${p.stok} Porsi</td>
-                    <td class="p-4 text-slate-700">Rp ${p.harga.toLocaleString('id-ID')}</td>
-                    <td class="p-4"><span class="text-xs px-2.5 py-1 rounded-full font-semibold ${p.status === 'Ready' && p.stok > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}">${p.status === 'Ready' && p.stok > 0 ? 'Tersedia' : 'Habis / Non-aktif'}</span></td>
-                </tr>
-            `).join('');
+        // --- HELPER FILTER DATES ---
+        function isDateInFilter(dateStr, startDate, endDate, monthStr) {
+            if (startDate && dateStr < startDate) return false;
+            if (endDate && dateStr > endDate) return false;
+            if (monthStr && !dateStr.startsWith(monthStr)) return false;
+            return true;
         }
 
-        function renderStockBahanTable() {
-            const tbody = document.getElementById('stock-bahan-table-body');
-            tbody.innerHTML = bahanBakuList.map(b => {
-                const totalValue = b.sisaStok * b.hargaGlobal;
-                return `
-                    <tr class="hover:bg-slate-50">
-                        <td class="p-4 font-semibold text-slate-800">${b.nama}</td>
-                        <td class="p-4 text-slate-500">${b.totalStok.toLocaleString('id-ID')} ${b.satuan}</td>
-                        <td class="p-4 font-bold ${b.sisaStok < (b.totalStok * 0.2) ? 'text-red-600' : 'text-emerald-600'}">${b.sisaStok.toLocaleString('id-ID')} ${b.satuan}</td>
-                        <td class="p-4 text-slate-500">${b.satuan}</td>
-                        <td class="p-4 font-semibold text-slate-700">Rp ${Math.round(totalValue).toLocaleString('id-ID')}</td>
-                    </tr>
-                `;
-            }).join('');
-        }
-
+        // --- LAPORAN 1: PENJUALAN HARIAN ---
         function renderDailyReport() {
             const tbody = document.getElementById('daily-report-table-body');
+            const startDate = document.getElementById('filter-daily-start').value;
+            const endDate = document.getElementById('filter-daily-end').value;
+            const monthStr = document.getElementById('filter-daily-month').value;
+
             const dailyData = {};
 
             transactionsList.forEach(tx => {
-                if (!dailyData[tx.tanggal]) {
-                    dailyData[tx.tanggal] = { txCount: 0, itemsCount: 0, totalOmset: 0 };
+                if (isDateInFilter(tx.tanggal, startDate, endDate, monthStr)) {
+                    if (!dailyData[tx.tanggal]) {
+                        dailyData[tx.tanggal] = { txCount: 0, itemsCount: 0, totalOmset: 0 };
+                    }
+                    dailyData[tx.tanggal].txCount += 1;
+                    dailyData[tx.tanggal].itemsCount += tx.items.reduce((sum, item) => sum + item.qty, 0);
+                    dailyData[tx.tanggal].totalOmset += tx.subtotal;
                 }
-                dailyData[tx.tanggal].txCount += 1;
-                dailyData[tx.tanggal].itemsCount += tx.items.reduce((sum, item) => sum + item.qty, 0);
-                dailyData[tx.tanggal].totalOmset += tx.subtotal;
             });
 
             const dates = Object.keys(dailyData);
             if (dates.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400">Belum ada transaksi recorded</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400">Tidak ada transaksi ditemukan</td></tr>`;
                 return;
             }
 
@@ -1156,12 +1396,30 @@ html_code = """
             `).join('');
         }
 
+        function resetDailyFilters() {
+            document.getElementById('filter-daily-start').value = "";
+            document.getElementById('filter-daily-end').value = "";
+            document.getElementById('filter-daily-month').value = "";
+            renderDailyReport();
+        }
+
+        // --- LAPORAN 2: TRANSAKSI METHOD ---
         function renderTxReport() {
             const tbody = document.getElementById('tx-report-table-body');
+            const startDate = document.getElementById('filter-tx-start').value;
+            const endDate = document.getElementById('filter-tx-end').value;
+            const monthStr = document.getElementById('filter-tx-month').value;
+            const methodFilter = document.getElementById('filter-tx-method').value;
 
             let totalCash = 0, totalTransfer = 0, totalEwallet = 0;
 
-            transactionsList.forEach(tx => {
+            const filteredTx = transactionsList.filter(tx => {
+                const passDate = isDateInFilter(tx.tanggal, startDate, endDate, monthStr);
+                const passMethod = (methodFilter === 'all' || tx.metode === methodFilter);
+                return passDate && passMethod;
+            });
+
+            filteredTx.forEach(tx => {
                 if (tx.metode === 'cash') totalCash += tx.total;
                 if (tx.metode === 'transfer') totalTransfer += tx.total;
                 if (tx.metode === 'ewallet') totalEwallet += tx.total;
@@ -1171,12 +1429,12 @@ html_code = """
             document.getElementById('tx-total-transfer').innerText = 'Rp ' + totalTransfer.toLocaleString('id-ID');
             document.getElementById('tx-total-ewallet').innerText = 'Rp ' + totalEwallet.toLocaleString('id-ID');
 
-            if (transactionsList.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Belum ada transaksi recorded</td></tr>`;
+            if (filteredTx.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="p-4 text-center text-slate-400">Tidak ada data transaksi cocok</td></tr>`;
                 return;
             }
 
-            tbody.innerHTML = transactionsList.map(tx => {
+            tbody.innerHTML = filteredTx.map(tx => {
                 const itemList = tx.items.map(i => `${i.nama} (${i.qty})`).join(', ');
                 const methodBadge = tx.metode === 'cash' ? 'bg-emerald-100 text-emerald-700' : (tx.metode === 'transfer' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700');
 
@@ -1193,7 +1451,17 @@ html_code = """
             }).join('');
         }
 
+        function resetTxFilters() {
+            document.getElementById('filter-tx-start').value = "";
+            document.getElementById('filter-tx-end').value = "";
+            document.getElementById('filter-tx-month').value = "";
+            document.getElementById('filter-tx-method').value = "all";
+            renderTxReport();
+        }
+
+        // --- LAPORAN 3: CASHFLOW & PENGELUARAN ---
         function saveExpense() {
+            const date = document.getElementById('expense-date').value || new Date().toISOString().split('T')[0];
             const kategori = document.getElementById('expense-category').value;
             const keterangan = document.getElementById('expense-desc').value;
             const nominal = parseFloat(document.getElementById('expense-amount').value) || 0;
@@ -1203,8 +1471,7 @@ html_code = """
                 return;
             }
 
-            const today = new Date().toISOString().split('T')[0];
-            expensesList.push({ tanggal: today, kategori, keterangan, nominal });
+            expensesList.push({ tanggal: date, kategori, keterangan, nominal });
 
             alert("Pengeluaran Berhasil Dicatat!");
             document.getElementById('expense-desc').value = "";
@@ -1214,12 +1481,26 @@ html_code = """
 
         function renderExpenseTable() {
             const tbody = document.getElementById('expense-table-body');
-            if (expensesList.length === 0) {
-                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400">Belum ada pengeluaran dicatat</td></tr>`;
+            const startDate = document.getElementById('filter-exp-start').value;
+            const endDate = document.getElementById('filter-exp-end').value;
+            const monthStr = document.getElementById('filter-exp-month').value;
+            const catFilter = document.getElementById('filter-exp-cat').value;
+
+            const filteredExp = expensesList.filter(exp => {
+                const passDate = isDateInFilter(exp.tanggal, startDate, endDate, monthStr);
+                const passCat = (catFilter === 'all' || exp.kategori === catFilter);
+                return passDate && passCat;
+            });
+
+            const totalExp = filteredExp.reduce((sum, item) => sum + item.nominal, 0);
+            document.getElementById('exp-filtered-total').innerText = 'Total: Rp ' + totalExp.toLocaleString('id-ID');
+
+            if (filteredExp.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-slate-400">Tidak ada pengeluaran dicatat</td></tr>`;
                 return;
             }
 
-            tbody.innerHTML = expensesList.map(exp => `
+            tbody.innerHTML = filteredExp.map(exp => `
                 <tr class="hover:bg-slate-50">
                     <td class="p-3 text-slate-500 text-xs">${exp.tanggal}</td>
                     <td class="p-3 font-semibold text-slate-700 text-xs">${exp.kategori}</td>
@@ -1229,7 +1510,20 @@ html_code = """
             `).join('');
         }
 
+        function resetExpFilters() {
+            document.getElementById('filter-exp-start').value = "";
+            document.getElementById('filter-exp-end').value = "";
+            document.getElementById('filter-exp-month').value = "";
+            document.getElementById('filter-exp-cat').value = "all";
+            renderExpenseTable();
+        }
+
+        // --- LAPORAN 4: PnL ---
         function renderPnLReport() {
+            const startDate = document.getElementById('filter-pnl-start').value;
+            const endDate = document.getElementById('filter-pnl-end').value;
+            const monthStr = document.getElementById('filter-pnl-month').value;
+
             let rawMaterialValue = 0;
             bahanBakuList.forEach(b => {
                 rawMaterialValue += (b.sisaStok * b.hargaGlobal);
@@ -1255,18 +1549,22 @@ html_code = """
             let totalOverhead = 0;
 
             transactionsList.forEach(tx => {
-                totalOmset += tx.subtotal;
-                totalCogs += tx.cogs;
-                totalOverhead += tx.overhead;
+                if (isDateInFilter(tx.tanggal, startDate, endDate, monthStr)) {
+                    totalOmset += tx.subtotal;
+                    totalCogs += tx.cogs;
+                    totalOverhead += tx.overhead;
+                }
             });
 
             const grossProfit = totalOmset - totalCogs - totalOverhead;
 
             let expBahan = 0, expOps = 0, expAsset = 0;
             expensesList.forEach(e => {
-                if (e.kategori === 'Bahan Baku') expBahan += e.nominal;
-                if (e.kategori === 'Operasional') expOps += e.nominal;
-                if (e.kategori === 'Asset') expAsset += e.nominal;
+                if (isDateInFilter(e.tanggal, startDate, endDate, monthStr)) {
+                    if (e.kategori === 'Bahan Baku') expBahan += e.nominal;
+                    if (e.kategori === 'Operasional') expOps += e.nominal;
+                    if (e.kategori === 'Asset') expAsset += e.nominal;
+                }
             });
 
             const netProfit = grossProfit - expOps - expAsset;
@@ -1287,6 +1585,13 @@ html_code = """
             document.getElementById('pnl-net-profit').innerText = 'Rp ' + Math.round(netProfit).toLocaleString('id-ID');
         }
 
+        function resetPnLFilters() {
+            document.getElementById('filter-pnl-start').value = "";
+            document.getElementById('filter-pnl-end').value = "";
+            document.getElementById('filter-pnl-month').value = "";
+            renderPnLReport();
+        }
+
         function saveSettings() {
             overheadRate = parseFloat(document.getElementById('set-overhead-rate').value) || 0;
             ppnRate = parseFloat(document.getElementById('set-ppn-rate').value) || 0;
@@ -1303,4 +1608,4 @@ html_code = """
 """
 
 # Menampilkan aplikasi web HTML di dalam Streamlit
-components.html(html_code, height=900, scrolling=True)
+components.html(html_code, height=950, scrolling=True)
