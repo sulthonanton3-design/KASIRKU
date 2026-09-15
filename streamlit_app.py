@@ -3,7 +3,6 @@ import sqlite3
 import pandas as pd
 from datetime import datetime
 import os
-from PIL import Image
 
 # ---------------------------------------------------------
 # SETUP DIRECTORY UNTUK GAMBAR
@@ -21,7 +20,7 @@ c = conn.cursor()
 # Membuat tabel-tabel jika belum ada
 c.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT, password TEXT, role TEXT)''')
 c.execute('''CREATE TABLE IF NOT EXISTS raw_materials (id INTEGER PRIMARY KEY, name TEXT, unit TEXT, stock REAL, cost_per_unit REAL, image TEXT)''')
-c.execute('''CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, name TEXT, price REAL, hpp REAL, image TEXT)''')
+c.execute('''CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, name TEXT, price REAL, hpp REAL, stock REAL DEFAULT 100, image TEXT)''')
 c.execute('''CREATE TABLE IF NOT EXISTS recipes (id INTEGER PRIMARY KEY, product_id INT, material_id INT, qty REAL)''')
 c.execute('''CREATE TABLE IF NOT EXISTS transactions (id INTEGER PRIMARY KEY, date TEXT, total REAL, payment_method TEXT, user TEXT)''')
 c.execute('''CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)''')
@@ -36,7 +35,7 @@ conn.commit()
 # ---------------------------------------------------------
 # AUTHENTICATION
 # ---------------------------------------------------------
-st.set_page_config(page_title="Sistem POS & HPP Kompleks", layout="wide")
+st.set_page_config(page_title="Sistem POS & HPP Modern", layout="wide")
 
 if 'logged_in' not in st.session_state:
     st.session_state['logged_in'] = False
@@ -44,7 +43,7 @@ if 'logged_in' not in st.session_state:
     st.session_state['role'] = ''
 
 def login():
-    st.title("🔑 Login Sistem Kasir & Manajemen HPP")
+    st.title("🔑 Login Kasir & Manajemen POS")
     col1, col2 = st.columns([1, 1])
     with col1:
         username = st.text_input("Username")
@@ -70,8 +69,9 @@ if not st.session_state['logged_in']:
 st.sidebar.title(f"👤 {st.session_state['username']} ({st.session_state['role']})")
 menu = st.sidebar.radio("Navigasi Menu", [
     "🛒 Kasir (POS)",
+    "📝 Kelola & Edit Produk",
     "📦 Input & Stok Bahan Baku",
-    "🍔 Kelola Produk & Perhitungan HPP",
+    "🍔 Buat Produk & Kalkulasi HPP",
     "📊 Laporan Transaksi & Analisis",
     "⚙️ Pengaturan Struk & Printer",
     "👥 Kelola User"
@@ -91,59 +91,77 @@ def save_uploaded_file(uploaded_file):
     return None
 
 # ---------------------------------------------------------
-# MENU 1: KASIR (POS)
+# MENU 1: KASIR (POS LAYOUT MODERN)
 # ---------------------------------------------------------
 if menu == "🛒 Kasir (POS)":
-    st.header("🛒 Kasir / Point of Sales")
+    col_catalog, col_cart = st.columns([2.5, 1.2])
     
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.subheader("Daftar Produk")
+    with col_catalog:
+        search_query = st.text_input("🔍 Scan barcode / cari nama produk...", placeholder="Ketik nama produk untuk mencari...")
+        
         products = pd.read_sql("SELECT * FROM products", conn)
         
+        if search_query:
+            products = products[products['name'].str.contains(search_query, case=False, na=False)]
+            
         if 'cart' not in st.session_state:
             st.session_state['cart'] = []
 
         if products.empty:
-            st.info("Belum ada produk jualan. Tambahkan produk di menu Kelola Produk.")
+            st.info("Tidak ada produk ditemukan.")
         else:
-            grid_cols = st.columns(3)
-            for idx, row in products.iterrows():
-                with grid_cols[idx % 3]:
-                    if row['image'] and os.path.exists(row['image']):
-                        st.image(row['image'], use_column_width=True)
-                    else:
-                        st.write("🖼️ *Tanpa Gambar*")
-                    st.write(f"**{row['name']}**")
-                    st.write(f"Rp {row['price']:,.0f}")
-                    if st.button(f"➕ Tambah", key=f"btn_{row['id']}"):
-                        st.session_state['cart'].append({"id": row['id'], "name": row['name'], "price": row['price']})
-                        st.success(f"{row['name']} masuk keranjang!")
+            cols = st.columns(4)
+            for idx, row in products.reset_index(drop=True).iterrows():
+                with cols[idx % 4]:
+                    with st.container(border=True):
+                        if row['image'] and os.path.exists(row['image']):
+                            st.image(row['image'], use_column_width=True)
+                        else:
+                            st.write("🖼️ *Tanpa Gambar*")
+                        st.markdown(f"**{row['name']}**")
+                        st.markdown(f"<h5 style='color: #1E88E5; margin:0;'>Rp {row['price']:,.0f}</h5>", unsafe_allow_html=True)
+                        st.caption(f"Stok: {row['stock']}")
+                        
+                        if st.button(f"➕ Tambah", key=f"btn_add_{row['id']}", use_container_width=True):
+                            st.session_state['cart'].append({"id": row['id'], "name": row['name'], "price": row['price']})
+                            st.rerun()
 
-    with col2:
-        st.subheader("🛒 Keranjang Belanja")
-        if st.session_state['cart']:
-            cart_df = pd.DataFrame(st.session_state['cart'])
-            summary = cart_df.groupby(['id', 'name', 'price']).size().reset_index(name='qty')
-            summary['subtotal'] = summary['price'] * summary['qty']
-            
-            st.dataframe(summary[['name', 'qty', 'subtotal']], hide_index=True, use_container_width=True)
-            
-            total = summary['subtotal'].sum()
-            st.markdown(f"### **Total: Rp {total:,.0f}**")
-            
-            pay_method = st.selectbox("Metode Pembayaran", ["Cash", "Transfer Bank", "E-Wallet (QRIS)"])
-            
-            col_b1, col_b2 = st.columns(2)
-            with col_b1:
-                if st.button("🔴 Selesaikan Transaksi", type="primary"):
+    with col_cart:
+        with st.container(border=True):
+            st.markdown("### 🛒 Keranjang")
+            if st.session_state['cart']:
+                cart_df = pd.DataFrame(st.session_state['cart'])
+                summary = cart_df.groupby(['id', 'name', 'price']).size().reset_index(name='qty')
+                summary['subtotal'] = summary['price'] * summary['qty']
+                
+                for _, item in summary.iterrows():
+                    c_info, c_btn = st.columns([3, 1])
+                    with c_info:
+                        st.write(f"**{item['name']}** x {item['qty']}")
+                        st.caption(f"Rp {item['price']:,.0f} = Rp {item['subtotal']:,.0f}")
+                    with c_btn:
+                        if st.button("❌", key=f"del_{item['id']}"):
+                            st.session_state['cart'] = [x for x in st.session_state['cart'] if x['id'] != item['id']]
+                            st.rerun()
+                    st.divider()
+                
+                subtotal = summary['subtotal'].sum()
+                st.write(f"**Subtotal:** Rp {subtotal:,.0f}")
+                
+                discount = st.number_input("Diskon (Rp)", min_value=0.0, value=0.0, step=1000.0)
+                total = max(0.0, subtotal - discount)
+                
+                st.markdown(f"## **TOTAL: Rp {total:,.0f}**")
+                
+                pay_method = st.selectbox("Metode Pembayaran", ["Cash", "Transfer Bank", "E-Wallet (QRIS)"])
+                
+                if st.button("💳 BAYAR SEKARANG", type="primary", use_container_width=True):
                     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     c.execute("INSERT INTO transactions (date, total, payment_method, user) VALUES (?, ?, ?, ?)",
                               (now, total, pay_method, st.session_state['username']))
                     
-                    # Potong Stok Bahan Baku Berdasarkan Resep
                     for _, item in summary.iterrows():
+                        c.execute("UPDATE products SET stock = stock - ? WHERE id=?", (item['qty'], item['id']))
                         c.execute("SELECT material_id, qty FROM recipes WHERE product_id=?", (item['id'],))
                         recipes = c.fetchall()
                         for mat_id, req_qty in recipes:
@@ -155,15 +173,88 @@ if menu == "🛒 Kasir (POS)":
                     st.balloons()
                     st.success("Transaksi Berhasil!")
                     st.rerun()
-            with col_b2:
-                if st.button("🗑️ Kosongkan"):
+                    
+                if st.button("🗑️ Kosongkan Keranjang", use_container_width=True):
                     st.session_state['cart'] = []
                     st.rerun()
-        else:
-            st.info("Keranjang masih kosong.")
+            else:
+                st.info("Keranjang kosong. Klik produk di sebelah kiri untuk menambahkan.")
 
 # ---------------------------------------------------------
-# MENU 2: INPUT & STOK BAHAN BAKU
+# MENU 2: KELOLA & EDIT PRODUK (FITUR BARU)
+# ---------------------------------------------------------
+elif menu == "📝 Kelola & Edit Produk":
+    st.header("📝 Daftar & Adjustment Produk")
+    st.caption("Gunakan menu ini untuk mengubah nama, harga, stok, atau menghapus produk yang terinput.")
+    
+    df_products = pd.read_sql("SELECT * FROM products", conn)
+    
+    if not df_products.empty:
+        df_display = df_products.copy()
+        df_display['price_fmt'] = df_display['price'].apply(lambda x: f"Rp {x:,.0f}")
+        df_display['hpp_fmt'] = df_display['hpp'].apply(lambda x: f"Rp {x:,.2f}")
+        
+        st.subheader("📋 Daftar Produk Saat Ini")
+        st.dataframe(
+            df_display[['id', 'name', 'price_fmt', 'hpp_fmt', 'stock', 'image']],
+            column_config={
+                "id": "ID",
+                "name": "Nama Produk",
+                "price_fmt": "Harga Jual",
+                "hpp_fmt": "HPP",
+                "stock": "Stok Produk",
+                "image": "Gambar Path"
+            },
+            hide_index=True,
+            use_container_width=True
+        )
+        
+        st.markdown("---")
+        st.subheader("⚙️ Adjust / Edit / Hapus Produk")
+        selected_prod_id = st.selectbox(
+            "Pilih Produk yang Ingin Diubah",
+            df_products['id'].tolist(),
+            format_func=lambda x: df_products[df_products['id'] == x]['name'].values[0]
+        )
+        
+        prod_data = df_products[df_products['id'] == selected_prod_id].iloc[0]
+        
+        col_ed1, col_ed2 = st.columns(2)
+        with col_ed1:
+            edit_name = st.text_input("Nama Produk", value=prod_data['name'])
+            edit_price = st.number_input("Harga Jual (Rp)", value=float(prod_data['price']), step=1000.0)
+            edit_hpp = st.number_input("HPP Produk (Rp)", value=float(prod_data['hpp']), step=500.0)
+        with col_ed2:
+            edit_stock = st.number_input("Jumlah Stok", value=float(prod_data['stock']), step=1.0)
+            edit_img = st.file_uploader("Ganti Foto Produk (Opsional)", type=["jpg", "png", "jpeg"])
+            if prod_data['image'] and os.path.exists(prod_data['image']):
+                st.image(prod_data['image'], width=100, caption="Foto Saat Ini")
+        
+        col_act1, col_act2 = st.columns(2)
+        with col_act1:
+            if st.button("💾 Simpan Perubahan Produk", type="primary", use_container_width=True):
+                if edit_img is not None:
+                    img_path = save_uploaded_file(edit_img)
+                else:
+                    img_path = prod_data['image']
+                    
+                c.execute("UPDATE products SET name=?, price=?, hpp=?, stock=?, image=? WHERE id=?",
+                          (edit_name, edit_price, edit_hpp, edit_stock, img_path, selected_prod_id))
+                conn.commit()
+                st.success(f"Produk '{edit_name}' berhasil diperbarui!")
+                st.rerun()
+        with col_act2:
+            if st.button("🗑️ Hapus Produk Ini", use_container_width=True):
+                c.execute("DELETE FROM products WHERE id=?", (selected_prod_id,))
+                c.execute("DELETE FROM recipes WHERE product_id=?", (selected_prod_id,))
+                conn.commit()
+                st.warning("Produk dan resep terkait berhasil dihapus!")
+                st.rerun()
+    else:
+        st.info("Belum ada produk terdaftar.")
+
+# ---------------------------------------------------------
+# MENU 3: INPUT & STOK BAHAN BAKU
 # ---------------------------------------------------------
 elif menu == "📦 Input & Stok Bahan Baku":
     st.header("📦 Manajemen Bahan Baku & Peringatan Stok")
@@ -242,12 +333,12 @@ elif menu == "📦 Input & Stok Bahan Baku":
         st.info("Belum ada data bahan baku.")
 
 # ---------------------------------------------------------
-# MENU 3: KELOLA PRODUK & PERHITUNGAN HPP (DILENGKAPI SIMULASI TARGET & PERSENTASE)
+# MENU 4: BUAT PRODUK & PERHITUNGAN HPP
 # ---------------------------------------------------------
-elif menu == "🍔 Kelola Produk & Perhitungan HPP":
-    st.header("🍔 Kelola Produk & Kalkulasi HPP (Bahan + Overhead)")
+elif menu == "🍔 Buat Produk & Kalkulasi HPP":
+    st.header("🍔 Buat Produk Baru & Kalkulasi HPP")
     
-    st.subheader("1. Input Biaya Operasional (Listrik, Air, Gaji, dll)")
+    st.subheader("1. Input Biaya Operasional (Overhead)")
     col_a, col_b = st.columns(2)
     with col_a:
         b_listrik = st.number_input("Biaya Listrik & Air / Bulan (Rp)", value=500000)
@@ -266,6 +357,7 @@ elif menu == "🍔 Kelola Produk & Perhitungan HPP":
     with col_p1:
         p_name = st.text_input("Nama Produk Jualan")
         p_price = st.number_input("Harga Jual Produk (Rp)", min_value=0.0)
+        p_stock = st.number_input("Stok Awal Jualan (Pcs)", min_value=1.0, value=100.0)
     with col_p2:
         p_img = st.file_uploader("Upload Foto Produk (Opsional)", type=["jpg", "png", "jpeg"])
 
@@ -277,7 +369,7 @@ elif menu == "🍔 Kelola Produk & Perhitungan HPP":
     selected_recipe_per_portion = []
     total_batch_cost = 0.0
     
-    st.write("**Bahan Baku yang Digunakan untuk Sekali Buat (1 Batch/Adonan):**")
+    st.write("**Bahan Baku yang Digunakan untuk Sekali Buat (1 Batch):**")
     if not mats_df.empty:
         for idx, row in mats_df.iterrows():
             batch_qty = st.number_input(f"Bahan {row['name']} ({row['unit']}) yang dipakai sekali buat", min_value=0.0, key=f"mat_{row['id']}")
@@ -294,7 +386,7 @@ elif menu == "🍔 Kelola Produk & Perhitungan HPP":
         margin_percent = (profit_per_porsi / p_price * 100) if p_price > 0 else 0.0
         
         st.markdown("---")
-        st.subheader("📊 3. Ringkasan Kalkulasi HPP & Persentase Keuntungan")
+        st.subheader("📊 3. Ringkasan Kalkulasi HPP & Margin Keuntungan")
         
         c_m1, c_m2, c_m3 = st.columns(3)
         c_m1.metric("HPP Bahan / Porsi", f"Rp {hpp_bahan_per_porsi:,.2f}")
@@ -306,41 +398,42 @@ elif menu == "🍔 Kelola Produk & Perhitungan HPP":
         c_m5.metric("Persentase Keuntungan (Margin %)", f"{margin_percent:.2f}%")
 
         st.markdown("---")
-        st.subheader("🎯 4. Simulasi Target Omset, Profit & Estimasi Modal Awal")
+        st.subheader("🎯 4. Simulasi Target Profit & Estimasi Modal")
         
         sim_col1, sim_col2 = st.columns(2)
         with sim_col1:
             st.markdown("##### 📌 Opsi A: Berdasarkan Target Profit Bulanan")
-            target_profit_monthly = st.number_input("Target Profit Bersih yang Diinginkan / Bulan (Rp)", value=5000000, step=500000)
+            target_profit_monthly = st.number_input("Target Profit Bersih / Bulan (Rp)", value=5000000, step=500000)
             if profit_per_porsi > 0:
-                pcs_needed_for_profit = target_profit_monthly / profit_per_porsi
-                omset_for_profit = pcs_needed_for_profit * p_price
-                capital_needed_for_profit = pcs_needed_for_profit * hpp_bahan_per_porsi
+                pcs_needed = target_profit_monthly / profit_per_porsi
+                omset_needed = pcs_needed * p_price
+                capital_needed = pcs_needed * hpp_bahan_per_porsi
                 
-                st.write(f"* Untuk dapat profit **Rp {target_profit_monthly:,.0f}/bulan**:")
-                st.write(f"  - Harusan Terjual: **{pcs_needed_for_profit:,.0f} Pcs/Bulan** (~{pcs_needed_for_profit/30:,.0f} pcs/hari)")
-                st.write(f"  - Target Omset: **Rp {omset_for_profit:,.0f}**")
-                st.write(f"  - Estimasi Modal Bahan Baku: **Rp {capital_needed_for_profit:,.0f}**")
+                st.write(f"* Untuk profit **Rp {target_profit_monthly:,.0f}/bulan**:")
+                st.write(f"  - Wajib Terjual: **{pcs_needed:,.0f} Pcs/Bulan** (~{pcs_needed/30:,.0f} pcs/hari)")
+                st.write(f"  - Target Omset: **Rp {omset_needed:,.0f}**")
+                st.write(f"  - Estimasi Modal Bahan: **Rp {capital_needed:,.0f}**")
             else:
-                st.warning("Harga jual harus lebih tinggi dari HPP untuk menghitung target profit!")
+                st.warning("Harga jual harus lebih tinggi dari HPP untuk menghitung target!")
 
         with sim_col2:
-            st.markdown("##### 📌 Opsi B: Estimasi Modal Menurut Rencana Produksi (Pcs)")
+            st.markdown("##### 📌 Opsi B: Estimasi Modal Berdasarkan Rencana Produksi")
             plan_pcs = st.number_input("Rencana Jumlah Produksi (Pcs)", value=500, step=50)
-            modal_bahan_total = plan_pcs * hpp_bahan_per_porsi
-            est_omset_total = plan_pcs * p_price
-            est_profit_total = plan_pcs * profit_per_porsi
+            modal_bahan = plan_pcs * hpp_bahan_per_porsi
+            est_omset = plan_pcs * p_price
+            est_profit = plan_pcs * profit_per_porsi
             
-            st.write(f"* Untuk membuat **{plan_pcs:,.0f} Pcs**:")
-            st.write(f"  - **Estimasi Modal Bahan Baku:** **Rp {modal_bahan_total:,.0f}**")
-            st.write(f"  - Potensi Omset: **Rp {est_omset_total:,.0f}**")
-            st.write(f"  - Potensi Profit Bersih: **Rp {est_profit_total:,.0f}**")
+            st.write(f"* Untuk produksi **{plan_pcs:,.0f} Pcs**:")
+            st.write(f"  - **Estimasi Modal Bahan:** **Rp {modal_bahan:,.0f}**")
+            st.write(f"  - Potensi Omset: **Rp {est_omset:,.0f}**")
+            st.write(f"  - Potensi Profit Bersih: **Rp {est_profit:,.0f}**")
 
         st.markdown("---")
         if st.button("💾 Simpan Produk Jualan", type="primary"):
             if p_name and p_price > 0:
                 img_path = save_uploaded_file(p_img)
-                c.execute("INSERT INTO products (name, price, hpp, image) VALUES (?, ?, ?, ?)", (p_name, p_price, total_hpp_satuan, img_path))
+                c.execute("INSERT INTO products (name, price, hpp, stock, image) VALUES (?, ?, ?, ?, ?)",
+                          (p_name, p_price, total_hpp_satuan, p_stock, img_path))
                 p_id = c.lastrowid
                 for m_id, q_per_porsi in selected_recipe_per_portion:
                     c.execute("INSERT INTO recipes (product_id, material_id, qty) VALUES (?, ?, ?)", (p_id, m_id, q_per_porsi))
@@ -353,11 +446,10 @@ elif menu == "🍔 Kelola Produk & Perhitungan HPP":
         st.warning("Tambahkan bahan baku terlebih dahulu di menu Bahan Baku!")
 
 # ---------------------------------------------------------
-# MENU 4: LAPORAN & FILTER TRANSAKSI
+# MENU 5: LAPORAN TRANSAKSI
 # ---------------------------------------------------------
 elif menu == "📊 Laporan Transaksi & Analisis":
     st.header("📊 Laporan Penjualan & Analisis Produk")
-    
     df_tx = pd.read_sql("SELECT * FROM transactions", conn)
     
     if not df_tx.empty:
@@ -376,18 +468,17 @@ elif menu == "📊 Laporan Transaksi & Analisis":
         st.info("Belum ada data transaksi yang tercatat.")
 
 # ---------------------------------------------------------
-# MENU 5: PENGATURAN STRUK & PRINTER
+# MENU 6: PENGATURAN STRUK
 # ---------------------------------------------------------
 elif menu == "⚙️ Pengaturan Struk & Printer":
     st.header("⚙️ Custom Struk Penjualan")
-    
     c.execute("SELECT value FROM settings WHERE key='receipt_header'")
     header_val = c.fetchone()[0]
     c.execute("SELECT value FROM settings WHERE key='receipt_footer'")
     footer_val = c.fetchone()[0]
     
-    new_header = st.text_area("Header Struk (Tulisan Bagian Atas Struk)", value=header_val)
-    new_footer = st.text_area("Footer Struk (Tulisan Bagian Bawah Struk)", value=footer_val)
+    new_header = st.text_area("Header Struk", value=header_val)
+    new_footer = st.text_area("Footer Struk", value=footer_val)
     
     if st.button("💾 Simpan Pengaturan Struk"):
         c.execute("UPDATE settings SET value=? WHERE key='receipt_header'", (new_header,))
@@ -396,7 +487,7 @@ elif menu == "⚙️ Pengaturan Struk & Printer":
         st.success("Pengaturan tulisan struk berhasil diperbarui!")
 
 # ---------------------------------------------------------
-# MENU 6: KELOLA USER
+# MENU 7: KELOLA USER
 # ---------------------------------------------------------
 elif menu == "👥 Kelola User":
     if st.session_state['role'] != 'Admin':
