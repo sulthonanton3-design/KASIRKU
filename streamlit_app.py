@@ -1,3 +1,29 @@
+import streamlit as st
+import streamlit.components.v1 as components
+
+# Konfigurasi Halaman Streamlit
+st.set_page_config(
+    page_title="KASIRKU - POS System",
+    page_icon="🛒",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
+
+# Sembunyikan elemen bawaan Streamlit agar tampilan full screen
+st.markdown("""
+    <style>
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        header {visibility: hidden;}
+        .block-container {
+            padding: 0rem !important;
+            max-width: 100% !important;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# Kode HTML, CSS, dan JavaScript KASIRKU
+html_code = """
 <!DOCTYPE html>
 <html lang="id">
 <head>
@@ -394,7 +420,6 @@
                 renderInventoryTables();
             }
 
-            // Re-initialize Lucide Icons for rendered tab content
             lucide.createIcons();
         }
 
@@ -507,7 +532,6 @@
 
             const change = cash - total;
 
-            // Render Invoice Struk
             document.getElementById('receipt-date').innerText = new Date().toLocaleString('id-ID');
             document.getElementById('receipt-items-list').innerHTML = cart.map(item => `
                 <div class="flex justify-between pt-1">
@@ -525,7 +549,6 @@
             document.getElementById('receipt-cash').innerText = `Rp ${cash.toLocaleString('id-ID')}`;
             document.getElementById('receipt-change').innerText = `Rp ${change.toLocaleString('id-ID')}`;
 
-            // Switch to receipt view
             document.getElementById('checkout-form-view').classList.add('hidden');
             document.getElementById('receipt-view').classList.remove('hidden');
         }
@@ -554,7 +577,7 @@
                 totalHpp += unitPrice * r.jumlah;
             });
 
-            const marginMultiplier = 1.40; // Target Margin 40%
+            const marginMultiplier = 1.40;
             const recPrice = totalHpp * marginMultiplier;
 
             document.getElementById('hpp-cost-display').innerText = `Rp ${Math.round(totalHpp).toLocaleString('id-ID')}`;
@@ -604,7 +627,6 @@
 
         // INVENTORY LOGIC
         function renderInventoryTables() {
-            // Render Stok Produk
             const invProdBody = document.getElementById('inv-product-table-body');
             if (invProdBody) {
                 invProdBody.innerHTML = products.map(p => `
@@ -621,7 +643,6 @@
                 `).join('');
             }
 
-            // Render Akumulasi Stok Bahan Baku
             const invBahanBody = document.getElementById('inv-bahan-table-body');
             if (invBahanBody) {
                 invBahanBody.innerHTML = bahanBakuList.map(b => `
@@ -637,3 +658,7 @@
     </script>
 </body>
 </html>
+"""
+
+# Render HTML di dalam iframe Streamlit
+components.html(html_code, height=950, scrolling=True)
