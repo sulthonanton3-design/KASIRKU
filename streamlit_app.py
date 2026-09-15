@@ -242,7 +242,7 @@ elif menu == "📦 Input & Stok Bahan Baku":
         st.info("Belum ada data bahan baku.")
 
 # ---------------------------------------------------------
-# MENU 3: KELOLA PRODUK & PERHITUNGAN HPP (LOGIKA RESEP REVISI)
+# MENU 3: KELOLA PRODUK & PERHITUNGAN HPP (DILENGKAPI SIMULASI TARGET & PERSENTASE)
 # ---------------------------------------------------------
 elif menu == "🍔 Kelola Produk & Perhitungan HPP":
     st.header("🍔 Kelola Produk & Kalkulasi HPP (Bahan + Overhead)")
@@ -260,7 +260,7 @@ elif menu == "🍔 Kelola Produk & Perhitungan HPP":
     st.info(f"💡 **Beban Biaya Overhead per Satuan Produk:** Rp {overhead_per_pcs:,.2f}")
 
     st.markdown("---")
-    st.subheader("2. Tambah Produk Jualan & Simulasi Resep Adonan")
+    st.subheader("2. Resep Adonan & Input Produk")
     
     col_p1, col_p2 = st.columns(2)
     with col_p1:
@@ -284,25 +284,59 @@ elif menu == "🍔 Kelola Produk & Perhitungan HPP":
             if batch_qty > 0:
                 cost_material = batch_qty * row['cost_per_unit']
                 total_batch_cost += cost_material
-                
-                # Menghitung porsi/penggunaan per 1 pcs untuk pemotongan stok otomatis saat kasir
                 qty_per_portion = batch_qty / yield_qty
                 selected_recipe_per_portion.append((row['id'], qty_per_portion))
                 
         # Perhitungan HPP per Porsi
         hpp_bahan_per_porsi = total_batch_cost / yield_qty
         total_hpp_satuan = hpp_bahan_per_porsi + overhead_per_pcs
+        profit_per_porsi = p_price - total_hpp_satuan
+        margin_percent = (profit_per_porsi / p_price * 100) if p_price > 0 else 0.0
         
-        st.markdown(f"""
-        ### 📊 Ringkasan Kalkulasi HPP:
-        * **Total Biaya Bahan 1 Adonan:** Rp {total_batch_cost:,.2f}
-        * **Hasil Adonan:** {yield_qty:,.0f} Porsi / Pcs
-        * **HPP Bahan per Porsi:** Rp {hpp_bahan_per_porsi:,.2f}
-        * **Biaya Overhead per Porsi:** Rp {overhead_per_pcs:,.2f}
-        * **TOTAL HPP PER PORSI:** **Rp {total_hpp_satuan:,.2f}**
-        * **Estimasi Margin Keuntungan:** Rp {p_price - total_hpp_satuan:,.2f}
-        """)
+        st.markdown("---")
+        st.subheader("📊 3. Ringkasan Kalkulasi HPP & Persentase Keuntungan")
         
+        c_m1, c_m2, c_m3 = st.columns(3)
+        c_m1.metric("HPP Bahan / Porsi", f"Rp {hpp_bahan_per_porsi:,.2f}")
+        c_m2.metric("Overhead / Porsi", f"Rp {overhead_per_pcs:,.2f}")
+        c_m3.metric("TOTAL HPP PER PORSI", f"Rp {total_hpp_satuan:,.2f}")
+        
+        c_m4, c_m5 = st.columns(2)
+        c_m4.metric("Profit (Rp) / Porsi", f"Rp {profit_per_porsi:,.2f}")
+        c_m5.metric("Persentase Keuntungan (Margin %)", f"{margin_percent:.2f}%")
+
+        st.markdown("---")
+        st.subheader("🎯 4. Simulasi Target Omset, Profit & Estimasi Modal Awal")
+        
+        sim_col1, sim_col2 = st.columns(2)
+        with sim_col1:
+            st.markdown("##### 📌 Opsi A: Berdasarkan Target Profit Bulanan")
+            target_profit_monthly = st.number_input("Target Profit Bersih yang Diinginkan / Bulan (Rp)", value=5000000, step=500000)
+            if profit_per_porsi > 0:
+                pcs_needed_for_profit = target_profit_monthly / profit_per_porsi
+                omset_for_profit = pcs_needed_for_profit * p_price
+                capital_needed_for_profit = pcs_needed_for_profit * hpp_bahan_per_porsi
+                
+                st.write(f"* Untuk dapat profit **Rp {target_profit_monthly:,.0f}/bulan**:")
+                st.write(f"  - Harusan Terjual: **{pcs_needed_for_profit:,.0f} Pcs/Bulan** (~{pcs_needed_for_profit/30:,.0f} pcs/hari)")
+                st.write(f"  - Target Omset: **Rp {omset_for_profit:,.0f}**")
+                st.write(f"  - Estimasi Modal Bahan Baku: **Rp {capital_needed_for_profit:,.0f}**")
+            else:
+                st.warning("Harga jual harus lebih tinggi dari HPP untuk menghitung target profit!")
+
+        with sim_col2:
+            st.markdown("##### 📌 Opsi B: Estimasi Modal Menurut Rencana Produksi (Pcs)")
+            plan_pcs = st.number_input("Rencana Jumlah Produksi (Pcs)", value=500, step=50)
+            modal_bahan_total = plan_pcs * hpp_bahan_per_porsi
+            est_omset_total = plan_pcs * p_price
+            est_profit_total = plan_pcs * profit_per_porsi
+            
+            st.write(f"* Untuk membuat **{plan_pcs:,.0f} Pcs**:")
+            st.write(f"  - **Estimasi Modal Bahan Baku:** **Rp {modal_bahan_total:,.0f}**")
+            st.write(f"  - Potensi Omset: **Rp {est_omset_total:,.0f}**")
+            st.write(f"  - Potensi Profit Bersih: **Rp {est_profit_total:,.0f}**")
+
+        st.markdown("---")
         if st.button("💾 Simpan Produk Jualan", type="primary"):
             if p_name and p_price > 0:
                 img_path = save_uploaded_file(p_img)
