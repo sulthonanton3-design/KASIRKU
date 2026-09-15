@@ -17,7 +17,6 @@ if not os.path.exists(UPLOAD_DIR):
 conn = sqlite3.connect('pos_hpp_system.db', check_same_thread=False)
 c = conn.cursor()
 
-# Membuat tabel-tabel utama jika belum ada
 c.execute('''CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, username TEXT, password TEXT, role TEXT)''')
 c.execute('''CREATE TABLE IF NOT EXISTS raw_materials (id INTEGER PRIMARY KEY, name TEXT, unit TEXT, stock REAL, cost_per_unit REAL, image TEXT)''')
 c.execute('''CREATE TABLE IF NOT EXISTS products (id INTEGER PRIMARY KEY, sku TEXT, name TEXT, category TEXT, price REAL, hpp REAL, stock REAL DEFAULT 100, image TEXT, is_draft INTEGER DEFAULT 0)''')
@@ -497,7 +496,7 @@ elif menu == "🍔 Buat Produk & Kalkulasi HPP":
                     img_path = save_uploaded_file(p_img)
                     final_sku = p_sku if p_sku else f"DPT-{int(datetime.now().timestamp())}"
                     
-                    # Diberikan 8 buah '?' yang persis sama dengan 8 kolom
+                    # 8 TANDA TANYA UNTUK 8 KOLOM DAN 8 VARIABEL TUPLE
                     c.execute("""
                         INSERT INTO products (sku, name, category, price, hpp, stock, image, is_draft) 
                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -518,7 +517,7 @@ elif menu == "🍔 Buat Produk & Kalkulasi HPP":
                 img_path = save_uploaded_file(p_img)
                 final_sku = p_sku if p_sku else f"DPT-{int(datetime.now().timestamp())}"
                 
-                # Diberikan 8 buah '?' yang persis sama dengan 8 kolom
+                # 8 TANDA TANYA UNTUK 8 KOLOM DAN 8 VARIABEL TUPLE
                 c.execute("""
                     INSERT INTO products (sku, name, category, price, hpp, stock, image, is_draft) 
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
